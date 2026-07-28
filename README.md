@@ -37,6 +37,16 @@ Or click the button above, unzip, and double-click `avvia.cmd`. Requires [Node.j
 
 **Why "Galatea"?** Pygmalion sculpted Galatea and the statue came to life. Open weights are the same story told backwards: intelligence that someone tried to keep as a statue, walking out of the museum. This harness just opens the door.
 
+## 🚧 Under construction
+
+<p align="center">
+  <img src="art/galatea-cantiere.svg" width="200" alt="pixel art: Galatea half-carved, still emerging from the marble block, construction tape below">
+</p>
+
+Galatea is under construction and might stay that way for a while: I am building her for myself, in my colors, for my own work.
+
+The funny part? Until yesterday I did not even use open models. Then I read one statement too many about how dangerous it is to let people run AI on their own machines, how the only responsible intelligence is the one you rent by the month. It pissed me off so much that, well, here we are. Nothing radicalizes you into open source faster than someone explaining that you cannot be trusted with it.
+
 ## How this was born
 
 This app was born in a single conversation. Federica Nardi ([@basicfede_](https://instagram.com/basicfede_)), an AI literacy educator from Italy, started the day asking her AI assistant to "help me install Kimi K3". A few hours later she had a tester for her real work, a spend dashboard, and finally this: a full local harness for agentic coding, in her own brand colors instead of the usual dark tech-bro aesthetic.
@@ -112,6 +122,16 @@ Un agente di coding locale, aperto, a zero dipendenze, che dà a **qualsiasi mod
 Funziona con **qualsiasi API compatibile OpenAI**: Kimi K3 su Moonshot (default), OpenRouter, Groq, Together, Mistral, o un modello tutto locale via Ollama. Un server Node, una pagina HTML, nient'altro.
 
 **Perché "Galatea"?** Pigmalione scolpì Galatea e la statua prese vita. I pesi aperti sono la stessa storia raccontata al contrario: un'intelligenza che qualcuno voleva tenere da statua, che esce dal museo. Questa app apre solo la porta.
+
+## 🚧 Lavori in corso
+
+<p align="center">
+  <img src="art/galatea-cantiere.svg" width="200" alt="pixel art: Galatea scolpita a metà, ancora dentro il blocco di marmo, nastro da cantiere sotto">
+</p>
+
+Galatea è in cantiere e potrebbe restarci un pezzo: la sto costruendo per me, coi miei colori, per il mio lavoro.
+
+La parte buffa? Fino a ieri i modelli open manco li usavo. Poi ho letto una dichiarazione di troppo su quanto sia pericoloso lasciare che la gente si faccia girare l'IA sul proprio computer, su come l'unica intelligenza responsabile sia quella che affitti al mese. Mi sono girate le palle al punto che, be', eccoci qua. Niente ti radicalizza verso l'open source più in fretta di qualcuno che ti spiega che non ci si può fidare di te.
 
 ## Come nasce
 
