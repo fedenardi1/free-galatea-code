@@ -14,8 +14,8 @@
 //  - trascrizione audio con Groq (se metti la chiave)
 
 import { createServer } from "node:http";
-import { readFile, writeFile, mkdir, readdir, stat, rename, rm } from "node:fs/promises";
-import { existsSync, createWriteStream } from "node:fs";
+import { readFile, writeFile, mkdir, readdir, stat, rename, rm, copyFile } from "node:fs/promises";
+import { existsSync, createWriteStream, watch } from "node:fs";
 import { spawn } from "node:child_process";
 import { join, resolve, dirname, relative, basename } from "node:path";
 import { homedir } from "node:os";
@@ -33,6 +33,11 @@ const DIR_SESSIONI = join(DATI, "sessioni");
 const DIR_MEMORIA = join(DATI, "memoria");
 const DIR_ANONIMI = join(DATI, "anonimi");
 const FILE_CONSUMI = join(DATI, "consumi.json");
+const DIR_CESTINO = join(DATI, "cestino");
+
+// comandi di sola lettura che girano SENZA conferma: servono all'auto-verifica.
+// Estendibili da config.json con "policy": { "liberi": ["^npm test$", ...] }
+const COMANDI_LIBERI_DEFAULT = [/^node --check\s/, /^git status\b/, /^git diff\b/, /^git log\b/];
 
 // difetti: Kimi K3 su Moonshot; dall'interfaccia puoi puntare qualunque endpoint
 const API_DEFAULT = "https://api.moonshot.ai/v1";
@@ -351,6 +356,7 @@ const FILE_ATTIVITA = join(DATI, "attivita.json");
 
 function prossimaEsecuzione(cadenza, da = new Date()) {
   const d = new Date(da.getTime());
+  if (cadenza.tipo === "cartella") return Number.MAX_SAFE_INTEGER; // parte sui cambi file, non a orario
   if (cadenza.tipo === "ore") return da.getTime() + Math.max(1, cadenza.n) * 3_600_000;
   const [h, m] = String(cadenza.ora || "09:00").split(":").map(Number);
   d.setHours(h || 9, m || 0, 0, 0);
@@ -391,6 +397,46 @@ async function eseguiAttivita(att) {
   } finally {
     clearTimeout(timer);
     inCorso.delete(sessione.id);
+  }
+}
+
+/* Osservatori: le attivita' con cadenza "cartella" partono quando cambiano i file
+   della cartella della sessione (debounce 60 secondi, si ignorano allegati/ e .git). */
+const osservatori = new Map(); // attivitaId -> { watcher, timer }
+
+async function sincronizzaOsservatori() {
+  const dati = await leggiJSON(FILE_ATTIVITA, { attivita: [] });
+  const validi = new Set();
+  for (const att of dati.attivita) {
+    if (!att.attiva || att.cadenza?.tipo !== "cartella") continue;
+    validi.add(att.id);
+    if (osservatori.has(att.id)) continue;
+    const sessione = await leggiJSON(fileSessione(att.sessioneId), null);
+    if (!sessione?.cartella || !existsSync(sessione.cartella)) continue;
+    try {
+      const voce = { watcher: null, timer: null };
+      voce.watcher = watch(sessione.cartella, { recursive: true }, (evento, nomeFile) => {
+        const f = String(nomeFile || "");
+        if (/^(allegati|\.git|node_modules)([\\/]|$)/i.test(f)) return;
+        clearTimeout(voce.timer);
+        voce.timer = setTimeout(async () => {
+          const freschi = await leggiJSON(FILE_ATTIVITA, { attivita: [] });
+          const viva = freschi.attivita.find((a) => a.id === att.id && a.attiva);
+          if (!viva) return;
+          viva.ultimaEsecuzione = Date.now();
+          await salvaJSON(FILE_ATTIVITA, freschi);
+          await eseguiAttivita(viva);
+          await salvaJSON(FILE_ATTIVITA, freschi);
+        }, 60_000);
+      });
+      osservatori.set(att.id, voce);
+    } catch {}
+  }
+  for (const [id, voce] of osservatori) {
+    if (!validi.has(id)) {
+      try { voce.watcher?.close(); clearTimeout(voce.timer); } catch {}
+      osservatori.delete(id);
+    }
   }
 }
 
@@ -505,7 +551,33 @@ const STRUMENTI = [
   { type: "function", function: { name: "trascrivi_audio", description: "Transcribes an audio file from the folder with Groq Whisper (needs the Groq key, max 25 MB).", parameters: { type: "object", properties: { percorso: { type: "string" } }, required: ["percorso"] } } },
   { type: "function", function: { name: "cerca_pacchetti", description: "Searches trusted public registries for packages/models you may need: npm, pypi, github, huggingface. Returns names, popularity and links. Use it BEFORE proposing an install.", parameters: { type: "object", properties: { registro: { type: "string", enum: ["npm", "pypi", "github", "huggingface"] }, query: { type: "string" } }, required: ["registro", "query"] } } },
   { type: "function", function: { name: "leggi_url", description: "Fetches a public https page as text (docs, READMEs, registry pages). 80KB max, no binaries. Use it to check a package before installing it.", parameters: { type: "object", properties: { url: { type: "string" } }, required: ["url"] } } },
+  { type: "function", function: { name: "annulla_modifiche", description: "Restores every file modified in THIS turn to the state it had before your first edit (automatic checkpoints). Use it when a verification shows you broke something. Created files are not deleted; commands cannot be undone.", parameters: { type: "object", properties: {} } } },
 ];
+
+/* Checkpoint automatici: prima di toccare un file esistente ne salviamo una copia
+   in ~\.galatea-code\cestino\<turno>\, cosi' annulla_modifiche puo' tornare indietro. */
+async function salvaBackup(ctx, percorsoAssoluto) {
+  try {
+    if (!existsSync(percorsoAssoluto)) return;
+    const rel = relative(ctx.cartella, percorsoAssoluto);
+    const dest = join(DIR_CESTINO, ctx.turnoId, rel);
+    if (existsSync(dest)) return; // gia' salvato in questo turno: vale la PRIMA versione
+    await mkdir(dirname(dest), { recursive: true });
+    await copyFile(percorsoAssoluto, dest);
+    ctx.backup.push(rel);
+  } catch {}
+}
+
+async function ripristinaBackup(ctx) {
+  const ripristinati = [];
+  for (const rel of ctx.backup) {
+    try {
+      await copyFile(join(DIR_CESTINO, ctx.turnoId, rel), join(ctx.cartella, rel));
+      ripristinati.push(rel);
+    } catch {}
+  }
+  return ripristinati;
+}
 
 async function usaStrumento(nome, args, ctx) {
   const { cartella, chiaveGroq, chiediConferma, anon } = ctx;
@@ -529,12 +601,20 @@ async function usaStrumento(nome, args, ctx) {
     case "scrivi_file": {
       const p = percorsoSicuro(cartella, args.percorso);
       await mkdir(dirname(p), { recursive: true });
+      await salvaBackup(ctx, p);
       const contenuto = vero(args.contenuto);
       await writeFile(p, contenuto, "utf8");
       return `wrote ${args.percorso} (${contenuto.length} chars)`;
     }
+    case "annulla_modifiche": {
+      const ripristinati = await ripristinaBackup(ctx);
+      return ripristinati.length
+        ? `restored ${ripristinati.length} file(s) to their state before this turn:\n${ripristinati.join("\n")}\n(files CREATED this turn are not deleted, and commands cannot be undone)`
+        : "nothing to restore: no files were modified in this turn";
+    }
     case "modifica_file": {
       const p = percorsoSicuro(cartella, args.percorso);
+      await salvaBackup(ctx, p);
       const testo = await readFile(p, "utf8");
       const cerca = vero(args.cerca), sostituisci = vero(args.sostituisci);
       const n = testo.split(cerca).length - 1;
@@ -564,8 +644,15 @@ async function usaStrumento(nome, args, ctx) {
           return "BLOCKED: self-improvement sessions work locally only. Pushing to the original author's repository is disabled by design. Fork the project and push to your own fork instead.";
         }
       }
-      const ok = await chiediConferma(comandoVero);
-      if (!ok) return "The user DENIED this command. Do not retry the same command: ask what they prefer.";
+      // comandi di verifica in sola lettura: liberi, anche nelle esecuzioni schedulate
+      const liberi = [...COMANDI_LIBERI_DEFAULT, ...(ctx.policyLiberi || [])];
+      const eLibero = liberi.some((re) => re.test(comandoVero.trim()));
+      if (!eLibero) {
+        const ok = await chiediConferma(comandoVero);
+        if (!ok) return ctx.schedulata
+          ? "DENIED: scheduled runs cannot execute commands (read-only verification commands like 'node --check' and 'git status/diff/log' are allowed)."
+          : "The user DENIED this command. Do not retry the same command: ask what they prefer.";
+      }
       return mascherato(await eseguiComando(comandoVero, cartella, ctx.segnale));
     }
     case "salva_memoria": {
@@ -616,8 +703,12 @@ async function usaStrumento(nome, args, ctx) {
 
 /* -------------------------------------------------------------- prompt sistema */
 
-async function promptSistema(cartella, anonAttivo) {
+async function promptSistema(cartella, anonAttivo, riassunto = "") {
   const { globale, progetto } = await leggiMemoria(cartella || "");
+  const notaRiassunto = riassunto ? `
+
+## Summary of earlier work in this session
+${riassunto}` : "";
 
   const notaAnonChat = anonAttivo ? `
 
@@ -631,7 +722,7 @@ Date: ${oggiIT()}
 
 Rules:
 - Reply in the user's language. Be concise and concrete. Never use em dashes.
-- This is a plain chat with no project folder: you have no file tools here. If the user asks you to create, read or edit files, explain that chats have no tools by design, and that they should create a session on a folder (left sidebar, folder icon then "New session"): there you get full file tools, limited to that folder.${notaAnonChat}
+- This is a plain chat with no project folder: you have no file tools here. If the user asks you to create, read or edit files, explain that chats have no tools by design, and that they should create a session on a folder (left sidebar, folder icon then "New session"): there you get full file tools, limited to that folder.${notaAnonChat}${notaRiassunto}
 
 ## Global memory
 ${globale || "(empty)"}`;
@@ -675,7 +766,9 @@ Rules:
 - When you learn a stable user preference or a durable fact about the project, save it with salva_memoria.
 - Attachments: when the user attaches a file it is saved inside the project under allegati/ and the message contains a marker like [attached file: allegati/name.ext]. Go read or process that exact path with your tools (leggi_file for text, trascrivi_audio for audio, or equip yourself for other formats). Attached IMAGES also arrive inside the message as actual images: look at them directly, do not try to read image files with leggi_file.
 - EQUIP YOURSELF: if the task needs a capability you do not have (open a PDF, read an image, OCR, convert media...), do not just refuse. Search for a reputable package with cerca_pacchetti (npm, pypi, github, huggingface), check it with leggi_url if useful, then propose the install via esegui_comando (npm install, pip install, winget install). Prefer widely used, actively maintained projects and say in one line why you picked that one. Installs ALWAYS need the user's approval, and after installing verify it works with a quick command.
-- When you finish a piece of work, summarize in a few lines what you touched.${notaAnon}${istruzioniProgetto}
+- VERIFY YOUR WORK: after editing code, check it before declaring it done. These read-only commands run WITHOUT approval: "node --check <file>", "git status", "git diff", "git log". Use them freely. If a check shows you broke something, fix it or call annulla_modifiche.
+- CHECKPOINTS: every file you modify is automatically backed up at the start of the turn. annulla_modifiche restores everything you touched in this turn: use it instead of leaving a project half-broken.
+- When you finish a piece of work, summarize in a few lines what you touched.${notaAnon}${notaRiassunto}${istruzioniProgetto}
 
 ## Global memory
 ${globale || "(empty)"}
@@ -695,6 +788,19 @@ const inCorso = new Map();
  * `chiediConferma` decide comandi e connettori MCP (UI dal vivo, negato se schedulato).
  */
 async function eseguiTurno({ sessione, messaggioUtente, cfg, chiaveGroq, anonAttivo, rizzoBase, manda, chiediConferma, controllore, schedulata = false, autoMCP = false }) {
+  // tetto di spesa mensile DURO (config.json, campo "budget"): oltre, non parte niente
+  const cfgFile = await leggiJSON(FILE_CONFIG, {});
+  const budget = parseFloat(cfgFile.budget || 0);
+  if (budget > 0) {
+    const c = await leggiJSON(FILE_CONSUMI, { giorni: {} });
+    const mese = oggiIT().slice(0, 7);
+    const spesoMese = Object.entries(c.giorni || {}).filter(([g]) => g.startsWith(mese)).reduce((a, [, v]) => a + v, 0);
+    if (spesoMese >= budget) {
+      manda({ t: "errore", v: `Monthly budget reached: $${spesoMese.toFixed(2)} of $${budget.toFixed(2)}. Raise it in Settings (and save keys) or wait for next month. Nothing was sent.` });
+      return;
+    }
+  }
+
   const anon = anonAttivo ? await caricaAnonimi(sessione.cartella) : null;
   const usaRizzo = anon ? await rizzoVivo(rizzoBase) : false;
   const rizzoUrl = usaRizzo ? rizzoBase : null;
@@ -742,14 +848,22 @@ async function eseguiTurno({ sessione, messaggioUtente, cfg, chiaveGroq, anonAtt
     rizzoUrl,
     autoMCP,
     schedulata,
+    turnoId: randomUUID(),
+    backup: [],
+    policyLiberi: (cfgFile.policy?.liberi || []).map((s) => { try { return new RegExp(s); } catch { return null; } }).filter(Boolean),
     segnale: controllore.signal,
     chiediConferma,
   };
 
+  // sessioni fiume: il pezzo vecchio si riassume da solo invece di cadere nel vuoto
+  await comprimiContesto(sessione, cfg, manda);
+
   try {
     for (let giro = 0; giro < MAX_GIRI; giro++) {
-      const messaggi = [{ role: "system", content: await promptSistema(sessione.cartella, anonAttivo) },
-        ...sessione.messaggi.slice(-MAX_MESSAGGI)];
+      const coda = sessione.messaggi.slice(-MAX_MESSAGGI);
+      while (coda.length && coda[0].role === "tool") coda.shift();
+      const messaggi = [{ role: "system", content: await promptSistema(sessione.cartella, anonAttivo, sessione.riassunto) },
+        ...coda];
 
       // cartella = tutti gli strumenti; chat pura = solo i connettori MCP (se ci sono)
       const corpo = { model: cfg.modello, stream: true, stream_options: { include_usage: true }, messages: messaggi };
@@ -831,6 +945,44 @@ async function eseguiTurno({ sessione, messaggioUtente, cfg, chiaveGroq, anonAtt
     sessione.eventi.push(...eventiNuovi);
     sessione.ultimoUso = Date.now();
     await salvaJSON(fileSessione(sessione.id), sessione);
+  }
+}
+
+/** Oltre la soglia, il pezzo vecchio della conversazione diventa un riassunto. */
+async function comprimiContesto(sessione, cfg, manda) {
+  if (sessione.messaggi.length <= MAX_MESSAGGI) return;
+  try {
+    const daRiassumere = sessione.messaggi.slice(0, sessione.messaggi.length - 40);
+    const testo = daRiassumere.map((m) => {
+      const c = typeof m.content === "string" ? m.content
+        : (m.content || []).map((p) => (p.type === "text" ? p.text : "[image]")).join(" ");
+      const extra = m.tool_calls ? ` [tools: ${m.tool_calls.map((t) => t.function.name).join(", ")}]` : "";
+      return `${m.role}: ${String(c || "")}${extra}`.slice(0, 800);
+    }).join("\n");
+
+    const r = await fetch(`${cfg.base}/chat/completions`, {
+      method: "POST",
+      headers: { authorization: `Bearer ${cfg.chiave}`, "content-type": "application/json" },
+      body: JSON.stringify({
+        model: cfg.modello,
+        messages: [
+          { role: "system", content: "Summarize this working session compactly (max 400 words): decisions taken, files touched and their current state, open problems, user preferences. The summary replaces the old context, so keep everything needed to continue the work seamlessly. Preserve placeholders like {{PERSONA_1}} verbatim." },
+          { role: "user", content: (sessione.riassunto ? `Previous summary:\n${sessione.riassunto}\n\nNew events:\n` : "") + testo },
+        ],
+      }),
+      signal: AbortSignal.timeout(120_000),
+    });
+    if (!r.ok) throw new Error("summary call failed");
+    const d = await r.json();
+    const riassunto = d.choices?.[0]?.message?.content?.trim();
+    if (!riassunto) throw new Error("empty summary");
+    if (d.usage) await registraConsumo(sessione.id, d.usage, cfg.prezzi);
+    sessione.riassunto = riassunto;
+    sessione.messaggi = sessione.messaggi.slice(-40);
+    while (sessione.messaggi.length && sessione.messaggi[0].role === "tool") sessione.messaggi.shift();
+    manda({ t: "anon", v: "long session: older context compressed into a summary" });
+  } catch {
+    // se il riassunto fallisce si va avanti come prima: il taglio scorrevole nel loop fa da rete
   }
 }
 
@@ -1053,11 +1205,12 @@ const server = createServer(async (req, res) => {
     /* --- chiavi salvate su disco (servono alle attivita' schedulate) --- */
     if (p === "/api/config" && req.method === "GET") {
       const c = await leggiJSON(FILE_CONFIG, {});
-      return json(res, 200, { salvate: !!c.api, base: c.base || null, modello: c.modello || null, groq: !!c.groq });
+      return json(res, 200, { salvate: !!c.api, base: c.base || null, modello: c.modello || null, groq: !!c.groq, budget: c.budget || 0 });
     }
     if (p === "/api/config" && req.method === "POST") {
-      const { api, groq, base, modello, prezzi } = await corpoJSON(req);
-      await salvaJSON(FILE_CONFIG, { api: api || "", groq: groq || "", base: base || "", modello: modello || "", prezzi: prezzi || null });
+      const { api, groq, base, modello, prezzi, budget } = await corpoJSON(req);
+      const vecchia = await leggiJSON(FILE_CONFIG, {});
+      await salvaJSON(FILE_CONFIG, { ...vecchia, api: api || "", groq: groq || "", base: base || "", modello: modello || "", prezzi: prezzi || null, budget: parseFloat(budget) || 0 });
       return json(res, 200, { ok: true });
     }
     if (p === "/api/config" && req.method === "DELETE") {
@@ -1079,13 +1232,26 @@ const server = createServer(async (req, res) => {
       const att = { id: randomUUID(), sessioneId, prompt: prompt.trim(), cadenza, autoMCP: !!autoMCP, anonimizza: !!anonimizza, attiva: true, creato: Date.now(), prossima: prossimaEsecuzione(cadenza), ultimoEsito: null };
       dati.attivita.push(att);
       await salvaJSON(FILE_ATTIVITA, dati);
+      sincronizzaOsservatori();
       return json(res, 200, { ok: true, attivita: att });
+    }
+    /* webhook: fa partire un'attivita' ADESSO (per n8n, script, altri sistemi locali) */
+    const mTrig = p.match(/^\/api\/trigger\/([\w-]+)$/);
+    if (mTrig && req.method === "POST") {
+      const dati = await leggiJSON(FILE_ATTIVITA, { attivita: [] });
+      const att = dati.attivita.find((a) => a.id === mTrig[1]);
+      if (!att) return err(res, "task not found", 404);
+      att.ultimaEsecuzione = Date.now();
+      await salvaJSON(FILE_ATTIVITA, dati);
+      eseguiAttivita(att).then(() => salvaJSON(FILE_ATTIVITA, dati)).catch(() => {});
+      return json(res, 200, { ok: true, avviata: true });
     }
     const mAtt = p.match(/^\/api\/attivita\/([\w-]+)$/);
     if (mAtt && req.method === "DELETE") {
       const dati = await leggiJSON(FILE_ATTIVITA, { attivita: [] });
       dati.attivita = dati.attivita.filter((a) => a.id !== mAtt[1]);
       await salvaJSON(FILE_ATTIVITA, dati);
+      sincronizzaOsservatori();
       return json(res, 200, { ok: true });
     }
     if (mAtt && req.method === "POST") {
@@ -1095,6 +1261,7 @@ const server = createServer(async (req, res) => {
       att.attiva = !att.attiva;
       if (att.attiva) att.prossima = prossimaEsecuzione(att.cadenza);
       await salvaJSON(FILE_ATTIVITA, dati);
+      sincronizzaOsservatori();
       return json(res, 200, { ok: true, attiva: att.attiva });
     }
 
@@ -1160,4 +1327,5 @@ server.listen(PORTA, "127.0.0.1", () => {
   console.log("");
   avviaMCP();
   avviaScheduler();
+  sincronizzaOsservatori();
 });

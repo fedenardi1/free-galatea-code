@@ -233,6 +233,8 @@
     <div><label>Cached input</label><input id="pHit" type="number" step="0.01" value="0.3"></div>
     <div><label>Output</label><input id="pOut" type="number" step="0.01" value="15"></div>
   </div>
+  <label>Monthly hard budget in $ (0 = off; enforced server-side, save keys to apply)</label>
+  <input id="budgetMese" type="number" step="1" min="0" value="0">
 
   <h3>Transcriptions</h3>
   <label>Groq key (optional, for the trascrivi_audio tool)</label>
@@ -294,6 +296,7 @@
         <option value="ore">every N hours</option>
         <option value="giornaliera" selected>daily at</option>
         <option value="settimanale">weekly on</option>
+        <option value="cartella">when files change</option>
       </select></div>
     <div id="attCampoN" style="display:none"><label>N hours</label><input id="attN" type="number" value="6" min="1"></div>
     <div id="attCampoGiorno" style="display:none"><label>Day</label>
@@ -748,9 +751,13 @@ $('btnSalvaChiaviPC').onclick = async () => {
   await fetch('/api/config', { method:'POST', headers:{'Content-Type':'application/json'},
     body: JSON.stringify({ api: $('chiaveApi').value.trim(), groq: $('chiaveGroq').value.trim(),
       base: $('baseUrl').value.trim(), modello: $('modelId').value.trim(),
+      budget: parseFloat($('budgetMese').value) || 0,
       prezzi: { inputMiss: parseFloat($('pMiss').value)||3, inputHit: parseFloat($('pHit').value)||0.3, output: parseFloat($('pOut').value)||15 } }) })
   $('statoChiaviPC').textContent = 'saved on this PC'
 }
+;(async () => {
+  try { const c = await (await fetch('/api/config')).json(); if (c.budget) $('budgetMese').value = c.budget } catch {}
+})()
 $('btnScordaChiaviPC').onclick = async () => {
   await fetch('/api/config', { method:'DELETE' })
   $('statoChiaviPC').textContent = 'forgotten'
@@ -760,6 +767,7 @@ $('btnScordaChiaviPC').onclick = async () => {
 function cadenzaLeggibile(c){
   if (c.tipo === 'ore') return `every ${c.n}h`
   if (c.tipo === 'giornaliera') return `daily ${c.ora}`
+  if (c.tipo === 'cartella') return 'on file change'
   const giorni = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat']
   return `${giorni[c.giorno]} ${c.ora}`
 }
@@ -772,7 +780,8 @@ async function caricaAttivita(){
     el.style.cssText = 'border:2px solid var(--ink); border-radius:8px; padding:8px 10px; margin-bottom:6px; font-size:12px' + (a.attiva ? '' : '; opacity:.5')
     el.innerHTML = `<b>${cadenzaLeggibile(a.cadenza)}</b> in <i>${a.sessioneNome}</i> ${a.autoMCP?'&#128268;':''} ${a.anonimizza?'&#128373;':''}<br>
       ${a.prompt.slice(0,120).replace(/</g,'&lt;')}<br>
-      <span style="color:var(--spento)">next: ${new Date(a.prossima).toLocaleString('en-GB')}${a.ultimoEsito ? ' - last: '+a.ultimoEsito : ''}</span><br>
+      <span style="color:var(--spento)">${a.cadenza.tipo === 'cartella' ? 'watching the session folder' : 'next: ' + new Date(a.prossima).toLocaleString('en-GB')}${a.ultimoEsito ? ' - last: '+a.ultimoEsito : ''}</span><br>
+      <span style="color:var(--spento); font-size:10px">webhook: POST http://localhost:4318/api/trigger/${a.id}</span><br>
       <button data-az="toggle" data-id="${a.id}" style="font-size:11px; margin-top:4px; border:2px solid var(--ink); border-radius:4px; background:var(--offwhite)">${a.attiva?'pause':'resume'}</button>
       <button data-az="del" data-id="${a.id}" style="font-size:11px; margin-top:4px; border:2px solid var(--ink); border-radius:4px; background:var(--offwhite)">delete</button>`
     box.appendChild(el)
@@ -788,13 +797,14 @@ $('attTipo').onchange = () => {
   const t = $('attTipo').value
   $('attCampoN').style.display = t === 'ore' ? 'block' : 'none'
   $('attCampoGiorno').style.display = t === 'settimanale' ? 'block' : 'none'
-  $('attCampoOra').style.display = t === 'ore' ? 'none' : 'block'
+  $('attCampoOra').style.display = (t === 'ore' || t === 'cartella') ? 'none' : 'block'
 }
 $('btnCreaAttivita').onclick = async () => {
   if (!sessioneCorrente){ $('statoAttivita').textContent = 'open a session first'; return }
   const t = $('attTipo').value
   const cadenza = t === 'ore' ? { tipo:'ore', n: parseInt($('attN').value)||6 }
     : t === 'giornaliera' ? { tipo:'giornaliera', ora: $('attOra').value }
+    : t === 'cartella' ? { tipo:'cartella' }
     : { tipo:'settimanale', giorno: parseInt($('attGiorno').value), ora: $('attOra').value }
   const r = await fetch('/api/attivita', { method:'POST', headers:{'Content-Type':'application/json'},
     body: JSON.stringify({ sessioneId: sessioneCorrente.id, prompt: $('attPrompt').value, cadenza,
