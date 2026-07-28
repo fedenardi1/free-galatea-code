@@ -1,0 +1,479 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Kimi Code</title>
+<style>
+  :root{
+    --crema:#fef4e5; --offwhite:#fcfcfc; --ink:#323131; --lilla:#e7ccef;
+    --lime:#cfdc5b; --blu:#2e91fc; --rosso:#e05a4f;
+    --sfondo:var(--crema); --pannello:var(--offwhite); --bordo:var(--ink);
+    --testo:var(--ink); --spento:#7d7a72; --accento:var(--lime); --verde:#5a9e3f; --chip:var(--lilla);
+  }
+  *{box-sizing:border-box}
+  body{margin:0; height:100vh; display:flex; background:var(--sfondo); color:var(--testo);
+    font-family:"IBM Plex Mono",Consolas,monospace; font-size:13.5px}
+  h1,h2,.titolo{font-family:"Fraunces",Georgia,serif; font-weight:600}
+  ::-webkit-scrollbar{width:10px} ::-webkit-scrollbar-thumb{background:var(--lilla); border:1px solid var(--ink); border-radius:5px}
+  button{font-family:inherit; cursor:pointer}
+  input,textarea{font-family:inherit; color:var(--testo)}
+
+  /* ---- sidebar ---- */
+  #lato{width:270px; min-width:270px; background:var(--offwhite); border-right:2px solid var(--ink);
+    display:flex; flex-direction:column}
+  #lato h1{font-size:20px; margin:0; padding:16px 16px 10px; display:flex; align-items:center; gap:8px}
+  #lato h1 .logo{background:var(--lime); padding:0 6px; border:2px solid var(--ink); border-radius:6px; font-size:16px}
+  #nuova{margin:0 12px 12px; padding:10px; background:var(--crema); border:2px solid var(--ink); border-radius:10px;
+    box-shadow:3px 3px 0 var(--ink)}
+  #nuova input{width:100%; background:var(--offwhite); border:2px solid var(--ink); border-radius:6px;
+    padding:6px 8px; font-size:11px; margin-bottom:8px}
+  #nuova input:focus{outline:3px solid var(--blu); outline-offset:1px}
+  #nuova button{width:100%; background:var(--lime); color:var(--ink); border:2px solid var(--ink); border-radius:6px;
+    padding:7px; font-weight:700; font-size:12px; box-shadow:2px 2px 0 var(--ink)}
+  #nuova button:hover{transform:translate(1px,1px); box-shadow:1px 1px 0 var(--ink)}
+  #sessioni{flex:1; overflow-y:auto; padding:0 10px}
+  .sess{padding:8px 10px; border-radius:8px; cursor:pointer; margin-bottom:6px; border:2px solid transparent}
+  .sess:hover{background:var(--crema); border-color:var(--ink)}
+  .sess.attiva{background:var(--lilla); border-color:var(--ink); box-shadow:2px 2px 0 var(--ink)}
+  .sess .nome{font-size:13px; font-weight:700; white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
+  .sess .dove{font-size:10px; color:var(--spento); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; direction:rtl; text-align:left}
+  .sess .costo{font-size:10px; color:var(--spento)}
+  #fondo{border-top:2px solid var(--ink); padding:10px 14px; font-size:12px; background:var(--crema)}
+  #fondo button{background:none; border:none; color:var(--ink); padding:4px 0; display:block; font-size:12px}
+  #fondo button:hover{background:var(--lime)}
+
+  /* ---- area principale ---- */
+  #principale{flex:1; display:flex; flex-direction:column; min-width:0}
+  #testata{display:flex; align-items:center; gap:12px; padding:10px 18px; border-bottom:2px solid var(--ink);
+    font-size:12px; color:var(--spento); background:var(--offwhite)}
+  #testata .cartella{flex:1; white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
+  #testata .modello{background:var(--lilla); color:var(--ink); border:2px solid var(--ink); border-radius:20px; padding:1px 10px; font-weight:700}
+  #testata .spesa{color:var(--ink); background:var(--lime); padding:1px 8px; border-radius:6px}
+  #testata .spesa:empty{display:none}
+
+  #chat{flex:1; overflow-y:auto; padding:20px 0}
+  .colonna{max-width:840px; margin:0 auto; padding:0 24px}
+  .msg-utente{border:2px solid var(--ink); background:var(--lilla); border-radius:10px;
+    padding:10px 14px; margin:16px 0; white-space:pre-wrap; word-wrap:break-word; box-shadow:3px 3px 0 var(--ink)}
+  .msg-utente::before{content:"\276F  "; font-weight:700}
+  .msg-assistente{padding:6px 2px; margin:6px 0; white-space:pre-wrap; word-wrap:break-word; line-height:1.6}
+  .pensiero{color:var(--spento); font-size:12px; margin:6px 0}
+  .pensiero summary{cursor:pointer; font-style:italic}
+  .pensiero .corpo{white-space:pre-wrap; max-height:180px; overflow-y:auto; padding:6px 10px;
+    border-left:2px solid var(--lilla); margin-top:4px}
+  .tool{margin:8px 0; font-size:12px}
+  .tool summary{cursor:pointer; list-style:none; display:inline-flex; align-items:center; gap:8px; color:var(--spento);
+    background:var(--offwhite); border:2px solid var(--ink); border-radius:20px; padding:2px 12px}
+  .tool summary::before{content:"\25CF"; color:var(--verde); font-size:10px}
+  .tool.errore summary::before{color:var(--rosso)}
+  .tool .nome-tool{color:var(--ink); font-weight:700}
+  .tool pre{background:var(--offwhite); border:2px solid var(--ink); border-radius:8px; padding:10px;
+    overflow-x:auto; font-size:11px; margin:6px 0 0; max-height:260px; overflow-y:auto; white-space:pre-wrap}
+  .conferma{background:var(--offwhite); border:2px solid var(--ink); border-radius:10px; padding:12px 14px; margin:12px 0;
+    box-shadow:4px 4px 0 var(--ink)}
+  .conferma .comando{font-size:12px; background:var(--crema); border:2px solid var(--ink);
+    border-radius:6px; padding:8px 10px; margin:8px 0; white-space:pre-wrap}
+  .conferma button{border:2px solid var(--ink); border-radius:6px; padding:7px 16px; font-weight:700; margin-right:8px; font-size:12px;
+    box-shadow:2px 2px 0 var(--ink)}
+  .conferma button:hover{transform:translate(1px,1px); box-shadow:1px 1px 0 var(--ink)}
+  .conferma .si{background:var(--lime); color:var(--ink)}
+  .conferma .no{background:var(--offwhite); color:var(--ink)}
+  .errore-riga{color:var(--rosso); font-size:12px; margin:8px 0; font-weight:700}
+  .uso-riga{color:var(--spento); font-size:11px; margin:4px 0 14px; border-bottom:2px dashed var(--lilla); padding-bottom:10px}
+
+  /* ---- input ---- */
+  #zona-input{border-top:2px solid var(--ink); padding:14px 0 16px; background:var(--crema)}
+  #scatola{display:flex; gap:10px; align-items:flex-end; background:var(--offwhite);
+    border:2px solid var(--ink); border-radius:12px; padding:10px 12px; box-shadow:3px 3px 0 var(--ink)}
+  #scatola:focus-within{outline:3px solid var(--blu); outline-offset:1px}
+  #ingresso{flex:1; background:none; border:0; outline:0; resize:none; font-size:13.5px; line-height:1.4;
+    max-height:200px; min-height:22px}
+  #btnManda{background:var(--lime); border:2px solid var(--ink); border-radius:8px; color:var(--ink); font-weight:700;
+    padding:6px 14px; font-size:13px; box-shadow:2px 2px 0 var(--ink)}
+  #btnManda:hover{transform:translate(1px,1px); box-shadow:1px 1px 0 var(--ink)}
+  #btnStop{background:var(--rosso); border:2px solid var(--ink); border-radius:8px; color:var(--offwhite);
+    padding:6px 12px; font-size:13px; display:none; font-weight:700}
+  #aiuto-input{font-size:11px; color:var(--spento); margin-top:8px}
+
+  /* ---- pannelli modali ---- */
+  .velo{position:fixed; inset:0; background:rgba(50,49,49,.45); display:none; align-items:center; justify-content:center; z-index:10}
+  .velo.aperto{display:flex}
+  .modale{background:var(--offwhite); border:2px solid var(--ink); border-radius:12px; padding:20px;
+    width:min(560px, 92vw); max-height:84vh; overflow-y:auto; box-shadow:6px 6px 0 var(--ink)}
+  .modale h2{margin:0 0 12px; font-size:20px}
+  .modale label{display:block; font-size:11px; color:var(--spento); text-transform:uppercase; letter-spacing:.04em; margin:12px 0 4px}
+  .modale input, .modale textarea{width:100%; background:var(--crema); border:2px solid var(--ink);
+    border-radius:6px; padding:8px 10px; font-size:13px}
+  .modale input:focus, .modale textarea:focus{outline:3px solid var(--blu); outline-offset:1px}
+  .modale textarea{min-height:160px; resize:vertical; font-size:12px}
+  .modale .riga{display:flex; gap:8px; margin-top:14px}
+  .modale .riga button{border-radius:6px; padding:8px 16px; font-size:13px; border:2px solid var(--ink); background:var(--offwhite);
+    color:var(--ink); box-shadow:2px 2px 0 var(--ink); font-weight:700}
+  .modale .riga button:hover{transform:translate(1px,1px); box-shadow:1px 1px 0 var(--ink)}
+  .modale .riga .primario{background:var(--lime)}
+  .nota{font-size:11px; color:var(--spento); margin-top:8px; background:var(--lilla); border:2px solid var(--ink);
+    border-radius:6px; padding:8px 10px; color:var(--ink)}
+  #vuoto{color:var(--spento); text-align:center; margin-top:16vh; line-height:1.9}
+  #vuoto .logo{font-family:"Fraunces",Georgia,serif; font-size:34px; color:var(--ink)}
+  #vuoto .logo b{background:var(--lime); padding:0 8px}
+</style>
+</head>
+<body>
+
+<div id="lato">
+  <h1><span class="logo">&#10022;</span> Kimi Code</h1>
+  <div id="nuova">
+    <input id="nuovaCartella" placeholder="C:\percorso\del\progetto" spellcheck="false">
+    <button id="btnNuova">Nuova sessione</button>
+  </div>
+  <div id="sessioni"></div>
+  <div id="fondo">
+    <div id="spesaTotale" style="color:var(--spento); margin-bottom:6px">spesa: ...</div>
+    <button id="btnChiavi">&#9881; Chiavi API</button>
+    <button id="btnMemoria">&#9998; Memoria</button>
+  </div>
+</div>
+
+<div id="principale">
+  <div id="testata">
+    <span class="cartella" id="tCartella">nessuna sessione aperta</span>
+    <span class="spesa" id="tSpesa"></span>
+    <span class="modello">kimi-k3</span>
+  </div>
+  <div id="chat"><div class="colonna" id="transcript">
+    <div id="vuoto"><div class="logo">Kimi <b>Code</b></div>
+      <div id="dario" title="Dario Amodei che piange"></div>
+      <div style="font-size:11px; font-style:italic">ogni volta che la usi, da qualche parte, Dario Amodei piange</div>
+      <div style="margin-top:10px">Apri una sessione a sinistra,<br>o creane una nuova con la cartella del progetto.</div></div>
+  </div></div>
+  <div id="zona-input"><div class="colonna">
+    <div id="scatola">
+      <textarea id="ingresso" rows="1" placeholder="Scrivi cosa vuoi fare in questa cartella..."></textarea>
+      <button id="btnStop">&#9632; Stop</button>
+      <button id="btnManda">Invia</button>
+    </div>
+    <div id="aiuto-input">Invio per mandare, Shift+Invio per andare a capo. I comandi partono solo se li approvi tu.</div>
+  </div></div>
+</div>
+
+<!-- chiavi -->
+<div class="velo" id="veloChiavi"><div class="modale">
+  <h2>Chiavi API</h2>
+  <label>Kimi / Moonshot (obbligatoria)</label>
+  <input id="chiaveKimi" type="password" placeholder="sk-..." spellcheck="false">
+  <label>Groq (per trascrivere audio, facoltativa)</label>
+  <input id="chiaveGroq" type="password" placeholder="gsk_..." spellcheck="false">
+  <div class="nota">Restano in questo browser (localStorage) e viaggiano solo verso il server locale sulla tua macchina.</div>
+  <div class="riga">
+    <button class="primario" id="btnVerifica">Verifica Kimi</button>
+    <button id="btnChiudiChiavi">Chiudi</button>
+    <span id="statoVerifica" style="align-self:center; font-size:12px"></span>
+  </div>
+</div></div>
+
+<!-- memoria -->
+<div class="velo" id="veloMemoria"><div class="modale">
+  <h2>Memoria persistente</h2>
+  <label>Globale (tutte le sessioni)</label>
+  <textarea id="memGlobale"></textarea>
+  <label>Di questo progetto</label>
+  <textarea id="memProgetto"></textarea>
+  <div class="nota">L'agente la legge a ogni messaggio e puo' aggiungere note da solo con lo strumento salva_memoria.</div>
+  <div class="riga">
+    <button class="primario" id="btnSalvaMemoria">Salva</button>
+    <button id="btnChiudiMemoria">Chiudi</button>
+    <span id="statoMemoria" style="align-self:center; font-size:12px"></span>
+  </div>
+</div></div>
+
+<script>
+const $ = id => document.getElementById(id)
+let sessioneCorrente = null
+let generando = false
+
+/* ---- chiavi ---- */
+for (const [campo, ls] of [['chiaveKimi','kimi_code_key'],['chiaveGroq','kimi_code_groq']]){
+  $(campo).value = localStorage.getItem(ls) || ''
+  $(campo).oninput = e => localStorage.setItem(ls, e.target.value.trim())
+}
+const testaChiavi = () => {
+  const h = {}
+  if ($('chiaveKimi').value.trim()) h['x-kimi-key'] = $('chiaveKimi').value.trim()
+  if ($('chiaveGroq').value.trim()) h['x-groq-key'] = $('chiaveGroq').value.trim()
+  return h
+}
+$('btnChiavi').onclick = () => $('veloChiavi').classList.add('aperto')
+$('btnChiudiChiavi').onclick = () => $('veloChiavi').classList.remove('aperto')
+$('btnVerifica').onclick = async () => {
+  $('statoVerifica').textContent = 'verifico...'
+  const r = await fetch('/api/verifica', { method:'POST', headers: testaChiavi() })
+  const d = await r.json()
+  $('statoVerifica').textContent = d.ok ? 'funziona (' + d.modello + ')' : (d.messaggio || d.errore)
+  $('statoVerifica').style.color = d.ok ? 'var(--verde)' : 'var(--rosso)'
+}
+
+/* ---- spesa ---- */
+async function aggiornaSpesa(){
+  try{
+    const d = await (await fetch('/api/spesa')).json()
+    $('spesaTotale').textContent = `oggi $${d.oggi.toFixed(2)} - totale $${d.totale.toFixed(2)}`
+  }catch{}
+}
+aggiornaSpesa()
+
+/* ---- sessioni ---- */
+async function caricaSessioni(){
+  const d = await (await fetch('/api/sessioni')).json()
+  const box = $('sessioni')
+  box.innerHTML = ''
+  for (const s of d.sessioni){
+    const el = document.createElement('div')
+    el.className = 'sess' + (sessioneCorrente?.id === s.id ? ' attiva' : '')
+    el.innerHTML = `<div class="nome">${s.nome}</div><div class="dove">${s.cartella}</div><div class="costo">$${(s.costo||0).toFixed(3)} - ${s.nMessaggi} eventi</div>`
+    el.onclick = () => apriSessione(s.id)
+    el.oncontextmenu = async (e) => {
+      e.preventDefault()
+      if (confirm(`Chiudere e archiviare la sessione "${s.nome}"?`)){
+        await fetch('/api/sessioni/' + s.id, { method:'DELETE' })
+        if (sessioneCorrente?.id === s.id){ sessioneCorrente = null; $('transcript').innerHTML = ''; $('tCartella').textContent = 'nessuna sessione aperta' }
+        caricaSessioni()
+      }
+    }
+    box.appendChild(el)
+  }
+}
+caricaSessioni()
+
+$('btnNuova').onclick = async () => {
+  const cartella = $('nuovaCartella').value.trim()
+  if (!cartella) return
+  const r = await fetch('/api/sessioni', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ cartella }) })
+  const d = await r.json()
+  if (!r.ok){ alert(d.errore); return }
+  $('nuovaCartella').value = ''
+  await caricaSessioni()
+  apriSessione(d.sessione.id)
+}
+
+async function apriSessione(id){
+  const d = await (await fetch('/api/sessioni/' + id)).json()
+  sessioneCorrente = d
+  $('tCartella').textContent = d.cartella
+  $('tSpesa').textContent = `sessione $${(d.costo||0).toFixed(3)}`
+  $('transcript').innerHTML = ''
+  for (const ev of d.eventi || []) mostraEvento(ev, false)
+  caricaSessioni()
+  scendi(true)
+  $('ingresso').focus()
+}
+
+/* ---- transcript ---- */
+const scendi = (forza) => {
+  const c = $('chat')
+  if (forza || c.scrollTop + c.clientHeight >= c.scrollHeight - 120) c.scrollTop = c.scrollHeight
+}
+
+let ultimoAssistente = null, ultimoPensiero = null
+
+function mostraEvento(ev, vivo = true){
+  const t = $('transcript')
+  if (ev.t === 'utente'){
+    ultimoAssistente = null; ultimoPensiero = null
+    const el = document.createElement('div'); el.className = 'msg-utente'; el.textContent = ev.v
+    t.appendChild(el)
+  }
+  if (ev.t === 'assistente'){
+    const el = document.createElement('div'); el.className = 'msg-assistente'; el.textContent = ev.v
+    t.appendChild(el); ultimoAssistente = null
+  }
+  if (ev.t === 'tool'){
+    ultimoAssistente = null; ultimoPensiero = null
+    const el = document.createElement('details'); el.className = 'tool'
+    if ((ev.output || '').startsWith('ERRORE')) el.classList.add('errore')
+    const anteprima = JSON.stringify(ev.input || {}).slice(0, 90)
+    el.innerHTML = `<summary><span class="nome-tool">${ev.nome}</span> <span>${anteprima.replace(/</g,'&lt;')}</span></summary>
+      <pre>${(ev.output || '').replace(/</g,'&lt;')}</pre>`
+    t.appendChild(el)
+  }
+  if (vivo) scendi()
+}
+
+function testoVivo(pezzo){
+  if (!ultimoAssistente){
+    ultimoAssistente = document.createElement('div')
+    ultimoAssistente.className = 'msg-assistente'
+    $('transcript').appendChild(ultimoAssistente)
+  }
+  ultimoAssistente.textContent += pezzo
+  scendi()
+}
+function pensieroVivo(pezzo){
+  if (!ultimoPensiero){
+    ultimoPensiero = document.createElement('details')
+    ultimoPensiero.className = 'pensiero'
+    ultimoPensiero.innerHTML = '<summary>&#10035; ragionamento</summary><div class="corpo"></div>'
+    $('transcript').appendChild(ultimoPensiero)
+  }
+  const corpo = ultimoPensiero.querySelector('.corpo')
+  corpo.textContent += pezzo
+  corpo.scrollTop = 1e9
+  scendi()
+}
+
+/* ---- invio ---- */
+$('ingresso').addEventListener('keydown', e => {
+  if (e.key === 'Enter' && !e.shiftKey){ e.preventDefault(); manda() }
+})
+$('ingresso').addEventListener('input', function(){
+  this.style.height = 'auto'; this.style.height = Math.min(200, this.scrollHeight) + 'px'
+})
+$('btnManda').onclick = manda
+$('btnStop').onclick = () => fetch('/api/stop', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ sessioneId: sessioneCorrente?.id }) })
+
+async function manda(){
+  if (generando || !sessioneCorrente) return
+  const messaggio = $('ingresso').value.trim()
+  if (!messaggio) return
+  if (!$('chiaveKimi').value.trim()){ $('veloChiavi').classList.add('aperto'); return }
+  $('ingresso').value = ''; $('ingresso').style.height = 'auto'
+  $('vuoto')?.remove()
+  generando = true
+  $('btnManda').style.display = 'none'; $('btnStop').style.display = 'block'
+  mostraEvento({ t:'utente', v: messaggio })
+  ultimoAssistente = null; ultimoPensiero = null
+
+  try{
+    const r = await fetch('/api/chat', {
+      method:'POST', headers:{ 'Content-Type':'application/json', ...testaChiavi() },
+      body: JSON.stringify({ sessioneId: sessioneCorrente.id, messaggio })
+    })
+    if (!r.ok){
+      const d = await r.json().catch(()=>({}))
+      riga_errore(d.errore || ('errore ' + r.status))
+      return
+    }
+    const lettore = r.body.getReader(), dec = new TextDecoder()
+    let resto = ''
+    while (true){
+      const { done, value } = await lettore.read()
+      if (done) break
+      resto += dec.decode(value, { stream:true })
+      const righe = resto.split('\n\n'); resto = righe.pop()
+      for (const blocco of righe){
+        const riga = blocco.split('\n').find(x => x.startsWith('data:'))
+        if (!riga) continue
+        let ev; try{ ev = JSON.parse(riga.slice(5)) }catch{ continue }
+        gestisci(ev)
+      }
+    }
+  }catch(e){ riga_errore(e.message) }
+  finally{
+    generando = false
+    $('btnManda').style.display = 'block'; $('btnStop').style.display = 'none'
+    aggiornaSpesa(); caricaSessioni()
+  }
+}
+
+function riga_errore(testo){
+  const el = document.createElement('div'); el.className = 'errore-riga'; el.textContent = '\u2716 ' + testo
+  $('transcript').appendChild(el); scendi()
+}
+
+function gestisci(ev){
+  if (ev.t === 'testo') testoVivo(ev.v)
+  if (ev.t === 'pensiero') pensieroVivo(ev.v)
+  if (ev.t === 'tool'){
+    ultimoAssistente = null; ultimoPensiero = null
+    const el = document.createElement('details'); el.className = 'tool'; el.id = 'tool-vivo'
+    el.innerHTML = `<summary><span class="nome-tool">${ev.nome}</span> <span>${JSON.stringify(ev.input||{}).slice(0,90).replace(/</g,'&lt;')}</span></summary><pre>in corso...</pre>`
+    $('transcript').appendChild(el); scendi()
+  }
+  if (ev.t === 'tool_fine'){
+    const el = document.getElementById('tool-vivo')
+    if (el){
+      el.id = ''
+      el.querySelector('pre').textContent = ev.output || '(vuoto)'
+      if ((ev.output||'').startsWith('ERRORE')) el.classList.add('errore')
+    }
+  }
+  if (ev.t === 'conferma'){
+    const el = document.createElement('div'); el.className = 'conferma'
+    el.innerHTML = `<div><b>Kimi vuole eseguire questo comando:</b></div>
+      <div class="comando">${ev.comando.replace(/</g,'&lt;')}</div>
+      <button class="si">Esegui</button><button class="no">Nega</button>`
+    const decidi = async (ok) => {
+      await fetch('/api/conferma', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ id: ev.id, approvato: ok }) })
+      el.querySelectorAll('button').forEach(b => b.remove())
+      el.insertAdjacentHTML('beforeend', `<div style="font-size:12px; color:var(--spento)">${ok ? 'approvato' : 'negato'}</div>`)
+    }
+    el.querySelector('.si').onclick = () => decidi(true)
+    el.querySelector('.no').onclick = () => decidi(false)
+    $('transcript').appendChild(el); scendi(true)
+  }
+  if (ev.t === 'uso'){
+    const el = document.createElement('div'); el.className = 'uso-riga'
+    el.textContent = `${(ev.input||0).toLocaleString('it')} in (${(ev.cache||0).toLocaleString('it')} cache) - ${(ev.output||0).toLocaleString('it')} out - $${ev.costo.toFixed(4)} - sessione $${ev.sessione.toFixed(3)}`
+    $('transcript').appendChild(el)
+    $('tSpesa').textContent = `sessione $${ev.sessione.toFixed(3)}`
+    scendi()
+  }
+  if (ev.t === 'errore') riga_errore(ev.v)
+}
+
+/* ---- Dario Amodei in pixel art, che piange ---- */
+const DARIO_MAPPA = [
+  "....HHHHHHHH....",
+  "..HHHHHHHHHHHH..",
+  ".HHHHHHHHHHHHHH.",
+  ".HHHHHHHHHHHHHH.",
+  ".HHSSSSSSSSSSHH.",
+  ".HSSSSSSSSSSSSH.",
+  ".HSSEWSSSSEWSSH.",
+  ".HSSEESSSSEESSH.",
+  ".HSSSTSSSSTSSSH.",
+  ".BSSSTSSSSTSSSB.",
+  ".BBSSSSMMSSSSBB.",
+  ".BBBSSMMMMSSBBB.",
+  "..BBBBBBBBBBBB..",
+  "....CCCCCCCC....",
+  "..CCCCCCCCCCCC..",
+  ".CCCCCCCCCCCCCC.",
+]
+const DARIO_COLORI = { H:'#3d332a', S:'#f0c39b', E:'#323131', W:'#fcfcfc', T:'#2e91fc', B:'#55483c', M:'#a05c4a', C:'#647d94' }
+;(function disegnaDario(){
+  const el = $('dario'); if (!el) return
+  let rects = ''
+  DARIO_MAPPA.forEach((riga, y) => {
+    [...riga].forEach((c, x) => {
+      if (c !== '.') rects += `<rect x="${x}" y="${y}" width="1" height="1" fill="${DARIO_COLORI[c]}"/>`
+    })
+  })
+  el.innerHTML = `<svg width="120" height="120" viewBox="0 0 16 16" shape-rendering="crispEdges" role="img" aria-label="pixel art di Dario Amodei che piange">${rects}</svg>`
+  el.style.margin = '14px 0 4px'
+})()
+
+/* ---- memoria ---- */
+$('btnMemoria').onclick = async () => {
+  const cartella = sessioneCorrente?.cartella || ''
+  const d = await (await fetch('/api/memoria?cartella=' + encodeURIComponent(cartella))).json()
+  $('memGlobale').value = d.globale || ''
+  $('memProgetto').value = d.progetto || ''
+  $('memProgetto').disabled = !cartella
+  $('memProgetto').placeholder = cartella ? '' : 'apri una sessione per la memoria di progetto'
+  $('veloMemoria').classList.add('aperto')
+}
+$('btnChiudiMemoria').onclick = () => $('veloMemoria').classList.remove('aperto')
+$('btnSalvaMemoria').onclick = async () => {
+  await fetch('/api/memoria', { method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({ cartella: '', ambito: 'globale', testo: $('memGlobale').value }) })
+  if (sessioneCorrente){
+    await fetch('/api/memoria', { method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ cartella: sessioneCorrente.cartella, ambito: 'progetto', testo: $('memProgetto').value }) })
+  }
+  $('statoMemoria').textContent = 'salvata'
+  setTimeout(() => $('statoMemoria').textContent = '', 2000)
+}
+</script>
+</body>
+</html>
