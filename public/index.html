@@ -160,6 +160,7 @@
       <button class="sfoglia" id="btnSfoglia" title="Browse folders">&#128193;</button>
     </div>
     <button class="principale" id="btnNuova">New session</button>
+    <button class="principale" id="btnNuovaChat" style="margin-top:6px; background:var(--lilla)">&#128172; New chat (no folder)</button>
   </div>
   <div id="sessioni"></div>
   <div id="fondo">
@@ -241,12 +242,10 @@
   <input id="chiaveGroq" type="password" placeholder="gsk_..." spellcheck="false">
 
   <h3>Anonymizer</h3>
-  <div class="nota">Reversible local pseudonymization: listed names, emails, Italian mobile numbers, IBANs and tax codes become placeholders like <code>{{PERSONA_1}}</code> before anything leaves your machine. If <a href="https://github.com/Rizzo-AI-Academy/rizzo-pii" target="_blank">rizzo-pii</a> by Simone Rizzo is running locally, Galatea auto-uses its ML engine. Toggle it from the top bar.</div>
-  <label>Names to mask in this project (one per line)</label>
-  <textarea id="nomiAnon" placeholder="open a session to configure them"></textarea>
+  <div class="nota">Powered entirely by <a href="https://github.com/Rizzo-AI-Academy/rizzo-pii" target="_blank">rizzo-pii</a> by Simone Rizzo: a local ML model (22 PII categories) that turns personal data into placeholders like <code>{{FULLNAME_1}}</code> before anything leaves your machine. The mapping stays on your disk; answers are translated back locally. Toggle it from the top bar. It requires the rizzo-pii app running locally: <a href="https://github.com/Rizzo-AI-Academy/rizzo-pii/releases/latest" target="_blank">install it from the official releases</a>.</div>
   <div class="riga" style="margin-top:8px">
-    <button id="btnSalvaNomi">Save names</button>
-    <span id="statoNomi" style="align-self:center; font-size:12px"></span>
+    <button id="btnRizzoCheck">Check rizzo-pii</button>
+    <span id="statoRizzo" style="align-self:center; font-size:12px"></span>
   </div>
 
   <div class="riga">
@@ -306,25 +305,18 @@ const testaChiavi = () => {
   if (anonAttivo) h['x-anonimizza'] = '1'
   return h
 }
-$('btnChiavi').onclick = async () => {
-  $('veloChiavi').classList.add('aperto')
-  if (sessioneCorrente){
-    const d = await (await fetch('/api/anonimi?cartella=' + encodeURIComponent(sessioneCorrente.cartella))).json()
-    $('nomiAnon').value = (d.nomi || []).join('\n')
-    $('nomiAnon').disabled = false
-    $('statoNomi').textContent = d.mascherati ? `${d.mascherati} values already mapped` : ''
-  } else {
-    $('nomiAnon').value = ''; $('nomiAnon').disabled = true
-  }
+async function controllaRizzo(){
+  $('statoRizzo').textContent = 'checking...'
+  const cart = sessioneCorrente?.cartella || ''
+  const d = await (await fetch('/api/anonimi?cartella=' + encodeURIComponent(cart))).json()
+  $('statoRizzo').textContent = d.rizzo
+    ? `running on ${d.rizzoUrl}${d.mascherati ? ` - ${d.mascherati} values mapped` : ''}`
+    : 'not running: install or start rizzo-pii'
+  $('statoRizzo').style.color = d.rizzo ? 'var(--verde)' : 'var(--rosso)'
 }
+$('btnChiavi').onclick = () => { $('veloChiavi').classList.add('aperto'); controllaRizzo() }
+$('btnRizzoCheck').onclick = controllaRizzo
 $('btnChiudiChiavi').onclick = () => $('veloChiavi').classList.remove('aperto')
-$('btnSalvaNomi').onclick = async () => {
-  if (!sessioneCorrente) return
-  await fetch('/api/anonimi', { method:'POST', headers:{'Content-Type':'application/json'},
-    body: JSON.stringify({ cartella: sessioneCorrente.cartella, nomi: $('nomiAnon').value.split('\n') }) })
-  $('statoNomi').textContent = 'saved'
-  setTimeout(()=> $('statoNomi').textContent = '', 2000)
-}
 $('btnVerifica').onclick = async () => {
   $('statoVerifica').textContent = 'checking...'
   const r = await fetch('/api/verifica', { method:'POST', headers: testaChiavi() })
@@ -380,7 +372,7 @@ async function caricaSessioni(){
   for (const s of d.sessioni){
     const el = document.createElement('div')
     el.className = 'sess' + (sessioneCorrente?.id === s.id ? ' attiva' : '')
-    el.innerHTML = `<div class="nome">${s.nome}</div><div class="dove">${s.cartella}</div><div class="costo">$${(s.costo||0).toFixed(3)} - ${s.nMessaggi} events</div>`
+    el.innerHTML = `<div class="nome">${s.cartella ? '' : '&#128172; '}${s.nome}</div><div class="dove">${s.cartella || 'plain chat, no folder'}</div><div class="costo">$${(s.costo||0).toFixed(3)} - ${s.nMessaggi} events</div>`
     el.onclick = () => apriSessione(s.id)
     el.oncontextmenu = async (e) => {
       e.preventDefault()
@@ -392,12 +384,24 @@ async function caricaSessioni(){
     }
     box.appendChild(el)
   }
+  return d.sessioni
 }
-caricaSessioni()
+// al primo caricamento riapre da sola l'ultima sessione usata
+caricaSessioni().then(sessioni => {
+  if (!sessioneCorrente && sessioni?.length) apriSessione(sessioni[0].id)
+})
+
+$('btnNuovaChat').onclick = async () => {
+  const r = await fetch('/api/sessioni', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ chat: true }) })
+  const d = await r.json()
+  if (!r.ok){ alert(d.errore); return }
+  await caricaSessioni()
+  apriSessione(d.sessione.id)
+}
 
 $('btnNuova').onclick = async () => {
   const cartella = $('nuovaCartella').value.trim().replace(/^"+|"+$/g,'')
-  if (!cartella) return
+  if (!cartella){ riga_errore('Pick a folder first (or use "New chat" for a folderless chat).'); return }
   const r = await fetch('/api/sessioni', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ cartella }) })
   const d = await r.json()
   if (!r.ok){ alert(d.errore); return }
@@ -409,8 +413,9 @@ $('btnNuova').onclick = async () => {
 async function apriSessione(id){
   const d = await (await fetch('/api/sessioni/' + id)).json()
   sessioneCorrente = d
-  $('tCartella').textContent = d.cartella
+  $('tCartella').textContent = d.cartella || ('\u{1F4AC} ' + d.nome + ' (plain chat)')
   $('tSpesa').textContent = `session $${(d.costo||0).toFixed(3)}`
+  $('ingresso').placeholder = d.cartella ? 'Tell Galatea what to do in this folder...' : 'Chat with Galatea...'
   $('transcript').innerHTML = ''
   for (const ev of d.eventi || []) mostraEvento(ev, false)
   caricaSessioni()
@@ -482,10 +487,18 @@ $('btnManda').onclick = manda
 $('btnStop').onclick = () => fetch('/api/stop', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ sessioneId: sessioneCorrente?.id }) })
 
 async function manda(){
-  if (generando || !sessioneCorrente) return
+  if (generando) return
   const messaggio = $('ingresso').value.trim()
   if (!messaggio) return
-  if (!$('chiaveApi').value.trim()){ $('veloChiavi').classList.add('aperto'); return }
+  if (!sessioneCorrente){
+    riga_errore('No session open: pick a folder on the left and click "New session" first. Your message is still in the box.')
+    return
+  }
+  if (!$('chiaveApi').value.trim()){
+    riga_errore('Missing API key: set it in Settings (opening them now). Your message is still in the box.')
+    $('veloChiavi').classList.add('aperto')
+    return
+  }
   $('ingresso').value = ''; $('ingresso').style.height = 'auto'
   $('vuoto')?.remove()
   generando = true

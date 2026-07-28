@@ -108,8 +108,10 @@ async function leggiMemoria(cartella) {
    vive SOLO in locale (~\.galatea-code\anonimi\). Al modello arrivano i segnaposto;
    quando il modello scrive file o comandi, i segnaposto tornano valori veri. */
 
-const fileAnonimi = (cartella) => join(DIR_ANONIMI, slug(cartella) + ".json");
-const caricaAnonimi = (cartella) => leggiJSON(fileAnonimi(cartella), { nomi: [], mappa: {}, contatori: {} });
+// le chat senza cartella condividono una mappa unica "__chat__"
+const chiaveAnon = (cartella) => cartella || "__chat__";
+const fileAnonimi = (cartella) => join(DIR_ANONIMI, slug(chiaveAnon(cartella)) + ".json");
+const caricaAnonimi = (cartella) => leggiJSON(fileAnonimi(cartella), { mappa: {}, contatori: {} });
 
 function segnaposto(stato, tipo, valore) {
   for (const [seg, val] of Object.entries(stato.mappa)) {
@@ -152,23 +154,15 @@ async function anonimizzaConRizzo(urlBase, testo, stato) {
   return anon;
 }
 
-async function anonimizza(testo, stato, rizzoUrl = null) {
+/* L'anonimizzazione E' rizzo-pii: nessuna implementazione nostra di rilevazione.
+   Se l'anonimizzatore e' acceso ma rizzo-pii non gira, ci si ferma con un errore
+   chiaro invece di fingere una protezione che non c'e'. */
+async function anonimizza(testo, stato, rizzoUrl) {
   if (!testo || !stato) return testo;
-  let t = String(testo);
-  if (rizzoUrl) {
-    try { t = await anonimizzaConRizzo(rizzoUrl, t, stato); } catch { /* riserva: le regex sotto */ }
+  if (!rizzoUrl) {
+    throw new Error("Anonymizer is ON but rizzo-pii is not running on 127.0.0.1:5005. Start it, install it from github.com/Rizzo-AI-Academy/rizzo-pii, or turn the anonymizer off.");
   }
-  // prima i nomi espliciti (i piu' lunghi per primi, cosi' "Anna Maria Rossi" batte "Anna")
-  for (const nome of [...stato.nomi].filter(Boolean).sort((a, b) => b.length - a.length)) {
-    const re = new RegExp(nome.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "gi");
-    t = t.replace(re, () => segnaposto(stato, "PERSONA", nome));
-  }
-  t = t.replace(/[\w.+-]+@[\w-]+(?:\.[\w-]+)+/g, (m) => segnaposto(stato, "EMAIL", m));
-  t = t.replace(/\bIT\d{2}[A-Za-z]\d{10}[A-Za-z0-9]{12}\b/g, (m) => segnaposto(stato, "IBAN", m));
-  t = t.replace(/\b[A-Za-z]{6}\d{2}[A-Za-z]\d{2}[A-Za-z]\d{3}[A-Za-z]\b/g, (m) => segnaposto(stato, "CODICEFISCALE", m));
-  // solo cellulari italiani: meno falsi positivi dentro il codice
-  t = t.replace(/(?:\+39[\s.]?)?\b3\d{2}[\s.\/]?\d{6,7}\b/g, (m) => segnaposto(stato, "TELEFONO", m));
-  return t;
+  return anonimizzaConRizzo(rizzoUrl, String(testo), stato);
 }
 
 function deanonimizza(testo, stato) {
@@ -346,7 +340,26 @@ async function usaStrumento(nome, args, ctx) {
 /* -------------------------------------------------------------- prompt sistema */
 
 async function promptSistema(cartella, anonAttivo) {
-  const { globale, progetto } = await leggiMemoria(cartella);
+  const { globale, progetto } = await leggiMemoria(cartella || "");
+
+  const notaAnonChat = anonAttivo ? `
+
+## Anonymizer active
+Personal data is pseudonymized with placeholders like {{PERSONA_1}}. Treat them as proper nouns and REPEAT THEM VERBATIM: they are replaced with the real values locally. Never try to guess the real values.` : "";
+
+  // chat pura, senza cartella: niente strumenti, solo conversazione
+  if (!cartella) {
+    return `You are Galatea (Free Galatea Code), a helpful assistant running locally on the user's computer.
+Date: ${oggiIT()}
+
+Rules:
+- Reply in the user's language. Be concise and concrete. Never use em dashes.
+- This is a plain chat with no project folder: you have no file tools here.${notaAnonChat}
+
+## Global memory
+${globale || "(empty)"}`;
+  }
+
   let istruzioniProgetto = "";
   for (const nome of ["GALATEA.md", "KIMI.md", "CLAUDE.md"]) {
     try { istruzioniProgetto = `\n\n## Istruzioni del progetto (${nome})\n${await readFile(join(cartella, nome), "utf8")}`; break; } catch {}
@@ -395,15 +408,22 @@ async function giroAgente(req, res, sessione, messaggioUtente) {
   const controllore = new AbortController();
   inCorso.set(sessione.id, controllore);
 
-  // motore di anonimizzazione: rizzo-pii se e' acceso in locale, altrimenti regex interne
+  // il motore di anonimizzazione E' rizzo-pii: se manca, ci si ferma subito e chiaro
   const rizzoBase = req.headers["x-rizzo-url"] || process.env.RIZZO_PII_URL || RIZZO_URL_DEFAULT;
   const usaRizzo = anon ? await rizzoVivo(rizzoBase) : false;
   const rizzoUrl = usaRizzo ? rizzoBase : null;
+  if (anonAttivo && !usaRizzo) {
+    manda({ t: "errore", v: "Anonymizer is ON but rizzo-pii is not running on 127.0.0.1:5005. Start it, install it from github.com/Rizzo-AI-Academy/rizzo-pii, or turn the anonymizer off. Nothing was sent." });
+    manda({ t: "fine" });
+    inCorso.delete(sessione.id);
+    res.end();
+    return;
+  }
 
   const eventiNuovi = [{ t: "utente", v: messaggioUtente, ts: Date.now() }];
   const perModello = anon ? await anonimizza(messaggioUtente, anon, rizzoUrl) : messaggioUtente;
   if (anon) {
-    manda({ t: "anon", v: `${Object.keys(anon.mappa).length} values masked - engine: ${usaRizzo ? "rizzo-pii (local)" : "built-in (regex)"}` });
+    manda({ t: "anon", v: `${Object.keys(anon.mappa).length} values masked - engine: rizzo-pii (local)` });
   }
   sessione.messaggi.push({ role: "user", content: perModello });
 
@@ -426,11 +446,15 @@ async function giroAgente(req, res, sessione, messaggioUtente) {
       const messaggi = [{ role: "system", content: await promptSistema(sessione.cartella, anonAttivo) },
         ...sessione.messaggi.slice(-MAX_MESSAGGI)];
 
+      // nelle chat senza cartella niente strumenti: solo conversazione
+      const corpo = { model: cfg.modello, stream: true, stream_options: { include_usage: true }, messages: messaggi };
+      if (sessione.cartella) corpo.tools = STRUMENTI;
+
       const r = await fetch(`${cfg.base}/chat/completions`, {
         method: "POST",
         signal: controllore.signal,
         headers: { authorization: `Bearer ${cfg.chiave}`, "content-type": "application/json" },
-        body: JSON.stringify({ model: cfg.modello, stream: true, stream_options: { include_usage: true }, tools: STRUMENTI, messages: messaggi }),
+        body: JSON.stringify(corpo),
       });
       if (!r.ok) { const t = await r.text(); manda({ t: "errore", v: `API ${r.status}: ${t.slice(0, 500)}` }); break; }
 
@@ -522,7 +546,15 @@ const server = createServer(async (req, res) => {
     if (p === "/api/sessioni" && req.method === "GET") return json(res, 200, { sessioni: await elencaSessioni() });
 
     if (p === "/api/sessioni" && req.method === "POST") {
-      const { cartella, nome } = await corpoJSON(req);
+      const { cartella, nome, chat } = await corpoJSON(req);
+
+      // chat pura: nessuna cartella, nessuno strumento
+      if (chat) {
+        const sessione = { id: randomUUID(), nome: nome || `Chat ${new Date().toLocaleDateString("en-GB")}`, cartella: null, creato: Date.now(), ultimoUso: Date.now(), costo: 0, messaggi: [], eventi: [] };
+        await salvaJSON(fileSessione(sessione.id), sessione);
+        return json(res, 200, { sessione: { id: sessione.id, nome: sessione.nome, cartella: null } });
+      }
+
       // Windows "copia come percorso" incolla le virgolette attorno: via
       const abs = resolve(String(cartella || "").trim().replace(/^"+|"+$/g, ""));
       if (!existsSync(abs)) return err(res, `Folder does not exist: ${abs}`);
@@ -611,17 +643,11 @@ const server = createServer(async (req, res) => {
       return json(res, 200, { ok: true });
     }
 
-    /* nomi da mascherare + stato della mappa, per progetto */
+    /* stato dell'anonimizzatore: rizzo-pii raggiungibile? quanti valori in mappa? */
     if (p === "/api/anonimi" && req.method === "GET") {
       const stato = await caricaAnonimi(url.searchParams.get("cartella") || "");
-      return json(res, 200, { nomi: stato.nomi, mascherati: Object.keys(stato.mappa).length });
-    }
-    if (p === "/api/anonimi" && req.method === "POST") {
-      const { cartella, nomi } = await corpoJSON(req);
-      const stato = await caricaAnonimi(cartella || "");
-      stato.nomi = (nomi || []).map((n) => String(n).trim()).filter(Boolean);
-      await salvaJSON(fileAnonimi(cartella || ""), stato);
-      return json(res, 200, { ok: true, nomi: stato.nomi.length });
+      const base = process.env.RIZZO_PII_URL || RIZZO_URL_DEFAULT;
+      return json(res, 200, { mascherati: Object.keys(stato.mappa).length, rizzo: await rizzoVivo(base), rizzoUrl: base });
     }
 
     if (p === "/api/verifica" && req.method === "POST") {
