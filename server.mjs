@@ -14,10 +14,10 @@
 //  - trascrizione audio con Groq (se metti la chiave)
 
 import { createServer } from "node:http";
-import { readFile, writeFile, mkdir, readdir, stat, rename } from "node:fs/promises";
-import { existsSync } from "node:fs";
+import { readFile, writeFile, mkdir, readdir, stat, rename, rm } from "node:fs/promises";
+import { existsSync, createWriteStream } from "node:fs";
 import { spawn } from "node:child_process";
-import { join, resolve, dirname, relative } from "node:path";
+import { join, resolve, dirname, relative, basename } from "node:path";
 import { homedir } from "node:os";
 import { fileURLToPath } from "node:url";
 import { randomUUID, createHash } from "node:crypto";
@@ -439,6 +439,7 @@ Rules:
 - Use modifica_file for small edits, scrivi_file for new files or rewrites.
 - Commands (esegui_comando) only run if the user approves them: propose them one at a time and explain what they are for.
 - When you learn a stable user preference or a durable fact about the project, save it with salva_memoria.
+- Attachments: when the user attaches a file it is saved inside the project under allegati/ and the message contains a marker like [attached file: allegati/name.ext]. Go read or process that exact path with your tools (leggi_file for text, trascrivi_audio for audio, or equip yourself for other formats).
 - EQUIP YOURSELF: if the task needs a capability you do not have (open a PDF, read an image, OCR, convert media...), do not just refuse. Search for a reputable package with cerca_pacchetti (npm, pypi, github, huggingface), check it with leggi_url if useful, then propose the install via esegui_comando (npm install, pip install, winget install). Prefer widely used, actively maintained projects and say in one line why you picked that one. Installs ALWAYS need the user's approval, and after installing verify it works with a quick command.
 - When you finish a piece of work, summarize in a few lines what you touched.${notaAnon}${istruzioniProgetto}
 
@@ -659,6 +660,52 @@ const server = createServer(async (req, res) => {
       attese.delete(id);
       risolvi(!!approvato);
       return json(res, 200, { ok: true });
+    }
+
+    /* Allegati: il file viene caricato come corpo grezzo (niente multipart) e
+       salvato in <cartella>/allegati/, poi il messaggio cita il percorso e
+       l'agente se lo va a prendere con i suoi strumenti. Nelle chat senza
+       cartella si accettano solo file di testo piccoli, restituiti inline. */
+    if (p === "/api/allegati" && req.method === "POST") {
+      const sessione = await leggiJSON(fileSessione(url.searchParams.get("sessioneId") || ""), null);
+      if (!sessione) return err(res, "session not found", 404);
+      const nomeGrezzo = decodeURIComponent(url.searchParams.get("nome") || "file");
+      const nome = (nomeGrezzo.replace(/[\\\/:*?"<>|]/g, "_").trim() || "file").slice(-120);
+
+      if (!sessione.cartella) {
+        const pezzi = []; let tot = 0;
+        for await (const c of req) {
+          tot += c.length;
+          if (tot > 300_000) return err(res, "Plain chats can only inline small text files (under 300 KB). For audio, video or big files, open a folder session.", 413);
+          pezzi.push(c);
+        }
+        const buf = Buffer.concat(pezzi);
+        if (buf.includes(0)) return err(res, "This looks like a binary file. Plain chats have no file tools: open a folder session to work with media.", 415);
+        return json(res, 200, { inline: buf.toString("utf8"), nome });
+      }
+
+      const dir = join(sessione.cartella, "allegati");
+      await mkdir(dir, { recursive: true });
+      let dest = join(dir, nome);
+      for (let i = 1; existsSync(dest); i++) {
+        const punto = nome.lastIndexOf(".");
+        dest = join(dir, punto > 0 ? `${nome.slice(0, punto)}-${i}${nome.slice(punto)}` : `${nome}-${i}`);
+      }
+      const MAX = 500 * 1024 * 1024;
+      let tot = 0;
+      const ws = createWriteStream(dest);
+      try {
+        for await (const c of req) {
+          tot += c.length;
+          if (tot > MAX) throw new Error("File over 500 MB");
+          if (!ws.write(c)) await new Promise((r) => ws.once("drain", r));
+        }
+        await new Promise((r, j) => { ws.on("error", j); ws.end(r); });
+      } catch (e) {
+        try { ws.destroy(); await rm(dest, { force: true }); } catch {}
+        return err(res, String(e.message || e), 413);
+      }
+      return json(res, 200, { percorso: "allegati/" + basename(dest), nome: basename(dest), byte: tot });
     }
 
     /* sfoglia le cartelle del disco, per il selettore nell'interfaccia */

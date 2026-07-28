@@ -196,11 +196,13 @@
   </div></div>
   <div id="zona-input"><div class="colonna">
     <div id="scatola">
+      <button id="btnAllega" title="Attach files (or drag them here)" style="background:var(--lilla); border:2px solid var(--ink); border-radius:8px; padding:6px 10px; font-size:13px">&#128206;</button>
       <textarea id="ingresso" rows="1" placeholder="Tell Galatea what to do in this folder..."></textarea>
       <button id="btnStop">&#9632; Stop</button>
       <button id="btnManda">Send</button>
     </div>
-    <div id="aiuto-input">Enter to send, Shift+Enter for a new line. Commands only run if you approve them.</div>
+    <input type="file" id="fileAllegato" multiple style="display:none">
+    <div id="aiuto-input">Enter to send, Shift+Enter for a new line. Attach files with &#128206; or by dragging them onto the box. Commands only run if you approve them.</div>
   </div></div>
 </div>
 
@@ -475,6 +477,36 @@ function pensieroVivo(pezzo){
   corpo.scrollTop = 1e9
   scendi()
 }
+
+/* ---- attachments: upload to the session folder, then cite the path ---- */
+async function allega(files){
+  if (!files?.length) return
+  if (!sessioneCorrente){ riga_errore('Open a session first, then attach files.'); return }
+  for (const f of files){
+    $('aiuto-input').textContent = `Uploading ${f.name} (${(f.size/1048576).toFixed(1)} MB)...`
+    try{
+      const r = await fetch(`/api/allegati?sessioneId=${encodeURIComponent(sessioneCorrente.id)}&nome=${encodeURIComponent(f.name)}`,
+        { method:'POST', body: f })
+      const d = await r.json()
+      if (!r.ok){ riga_errore(d.errore); continue }
+      const box = $('ingresso')
+      if (d.inline){
+        box.value += (box.value ? '\n\n' : '') + `[attached file: ${d.nome}]\n\`\`\`\n${d.inline}\n\`\`\``
+      } else {
+        box.value += (box.value ? '\n' : '') + `[attached file: ${d.percorso}]`
+      }
+      box.dispatchEvent(new Event('input'))
+    }catch(e){ riga_errore('Upload failed: ' + e.message) }
+  }
+  $('aiuto-input').textContent = 'Enter to send, Shift+Enter for a new line. Attach files with \u{1F4CE} or by dragging them onto the box. Commands only run if you approve them.'
+  $('ingresso').focus()
+}
+$('btnAllega').onclick = () => $('fileAllegato').click()
+$('fileAllegato').onchange = e => { allega(e.target.files); e.target.value = '' }
+const scatola = $('scatola')
+scatola.addEventListener('dragover', e => { e.preventDefault(); scatola.style.outline = '3px solid var(--blu)' })
+scatola.addEventListener('dragleave', () => { scatola.style.outline = '' })
+scatola.addEventListener('drop', e => { e.preventDefault(); scatola.style.outline = ''; allega(e.dataTransfer.files) })
 
 /* ---- send ---- */
 $('ingresso').addEventListener('keydown', e => {
