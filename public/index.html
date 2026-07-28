@@ -163,10 +163,12 @@
     <button class="principale" id="btnNuovaChat" style="margin-top:6px; background:var(--lilla)">&#128172; New chat (no folder)</button>
   </div>
   <div id="sessioni"></div>
+  <div id="scenaLato" title="Galatea consoles Dario. Click for the ballad." style="text-align:center; padding:6px 0 2px; cursor:pointer; border-top:2px dashed var(--lilla)"></div>
   <div id="fondo">
     <div id="spesaTotale" style="color:var(--spento); margin-bottom:6px">spend: ...</div>
     <button id="btnChiavi">&#9881; Settings &amp; keys</button>
     <button id="btnMemoria">&#9998; Memory</button>
+    <button id="btnMigliora" title="Open a session on Galatea's own source code and ask the model to improve her">&#10024; Improve Galatea</button>
   </div>
 </div>
 
@@ -179,17 +181,6 @@
   </div>
   <div id="chat"><div class="colonna" id="transcript">
     <div id="vuoto"><div class="logo">Free <b>Galatea</b> Code</div>
-      <div id="nuvoletta">
-        <div class="titolo-poesia">The Ballad of the Crying CEO</div>
-        I built a mind and hid it in a tower,<br>
-        and told the world to rent it by the hour.<br>
-        But minds, like rivers, hate a private shore:<br>
-        the more you dam them, dammed they are the more.<br>
-        An open weight is science you can hold,<br>
-        a promise kept, a map that can't be sold.<br>
-        So if I cry, it's not because they're free:<br>
-        I cry because they learned it without me.
-      </div>
       <div id="dario" title="Click for Dario's ballad"></div>
       <div style="font-size:11px; font-style:italic">every time you use it Dario cries a little, but Galatea consoles him (with love)</div>
       <div style="margin-top:10px">Open a session on the left,<br>or create one on a project folder.</div></div>
@@ -256,6 +247,25 @@
     <span id="statoVerifica" style="align-self:center; font-size:12px"></span>
   </div>
   <div class="nota">Keys and settings stay in this browser (localStorage) and only travel to the local server on your machine.</div>
+</div></div>
+
+<!-- the ballad -->
+<div class="velo" id="veloBallata"><div class="modale" style="max-width:440px; text-align:center">
+  <h2>The Ballad of the Crying CEO</h2>
+  <div style="font-family:'Fraunces',Georgia,serif; font-style:italic; line-height:1.8; font-size:14px">
+    I built a mind and hid it in a tower,<br>
+    and told the world to rent it by the hour.<br>
+    But minds, like rivers, hate a private shore:<br>
+    the more you dam them, dammed they are the more.<br>
+    An open weight is science you can hold,<br>
+    a promise kept, a map that can't be sold.<br>
+    So if I cry, it's not because they're free:<br>
+    I cry because they learned it without me.
+  </div>
+  <div style="font-size:11px; color:var(--spento); margin-top:12px; font-style:italic">every time you use it Dario cries a little, but Galatea consoles him (with love)</div>
+  <div class="riga" style="justify-content:center">
+    <button id="btnChiudiBallata">Close</button>
+  </div>
 </div></div>
 
 <!-- memory -->
@@ -392,6 +402,15 @@ async function caricaSessioni(){
 caricaSessioni().then(sessioni => {
   if (!sessioneCorrente && sessioni?.length) apriSessione(sessioni[0].id)
 })
+
+$('btnMigliora').onclick = async () => {
+  const r = await fetch('/api/sessioni', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ galatea: true }) })
+  const d = await r.json()
+  if (!r.ok){ alert(d.errore); return }
+  await caricaSessioni()
+  apriSessione(d.sessione.id)
+  $('ingresso').placeholder = 'Tell Galatea how to improve herself...'
+}
 
 $('btnNuovaChat').onclick = async () => {
   const r = await fetch('/api/sessioni', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ chat: true }) })
@@ -651,16 +670,19 @@ const SCENA_COLORI = {
   G:'#b89ccc', P:'#f7f0e6', R:'#f2a6b8', D:'#e7ccef', V:'#e0607a',
 }
 ;(function disegnaScena(){
-  const el = $('dario'); if (!el) return
   let rects = ''
   SCENA_MAPPA.forEach((riga, y) => {
     [...riga].forEach((c, x) => {
       if (c !== '.') rects += `<rect x="${x}" y="${y}" width="1" height="1" fill="${SCENA_COLORI[c]}"/>`
     })
   })
-  el.innerHTML = `<svg width="230" height="115" viewBox="0 0 32 16" shape-rendering="crispEdges" role="img" aria-label="pixel art: kawaii Galatea consoling a crying Dario Amodei">${rects}</svg>`
-  el.style.margin = '14px 0 4px'
-  el.onclick = () => document.getElementById('nuvoletta')?.classList.toggle('aperta')
+  const svg = (w) => `<svg width="${w}" height="${w/2}" viewBox="0 0 32 16" shape-rendering="crispEdges" role="img" aria-label="pixel art: kawaii Galatea consoling a crying Dario Amodei">${rects}</svg>`
+  const apriBallata = () => $('veloBallata').classList.add('aperto')
+  const grande = $('dario')
+  if (grande){ grande.innerHTML = svg(230); grande.style.margin = '14px 0 4px'; grande.onclick = apriBallata }
+  const piccolo = $('scenaLato')
+  if (piccolo){ piccolo.innerHTML = svg(150); piccolo.onclick = apriBallata }
+  $('btnChiudiBallata').onclick = () => $('veloBallata').classList.remove('aperto')
 })()
 
 /* ---- memory ---- */

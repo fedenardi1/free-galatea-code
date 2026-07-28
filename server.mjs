@@ -423,6 +423,21 @@ ${globale || "(empty)"}`;
   for (const nome of ["GALATEA.md", "KIMI.md", "CLAUDE.md"]) {
     try { istruzioniProgetto = `\n\n## Istruzioni del progetto (${nome})\n${await readFile(join(cartella, nome), "utf8")}`; break; } catch {}
   }
+
+  // sessione di automiglioramento: sta lavorando su se stessa
+  if (resolve(cartella).toLowerCase() === resolve(QUI).toLowerCase()) {
+    istruzioniProgetto += `
+
+## Self-improvement mode: you are editing YOUR OWN source code
+This folder is Free Galatea Code itself, the app you are running inside. Architecture: server.mjs is a zero-dependency Node http server (agent loop, tools, sessions, anonymizer bridge to rizzo-pii, spend tracking); public/index.html is the entire UI, vanilla JS, no frameworks.
+Hard rules:
+- Keep ZERO runtime dependencies and the current file structure.
+- Keep the basicfede look: cream #fef4e5, off-white #fcfcfc, ink #323131, lilac #e7ccef, lime #cfdc5b, blue #2e91fc, 2px ink borders, solid offset shadows, Fraunces for headings, IBM Plex Mono for body.
+- NEVER remove or weaken the command approval gate, the folder sandbox, or the anonymizer.
+- Never touch ~/.galatea-code (user data lives there, outside this repo).
+- After editing server.mjs, always run "node --check server.mjs" via esegui_comando. UI changes go live when the user reloads the page; server.mjs changes require restarting the app (tell the user: close and relaunch avvia.cmd).
+- Explain what you changed and how to see it.`;
+  }
   const notaAnon = anonAttivo ? `
 
 ## Anonymizer active
@@ -632,7 +647,17 @@ const server = createServer(async (req, res) => {
     if (p === "/api/sessioni" && req.method === "GET") return json(res, 200, { sessioni: await elencaSessioni() });
 
     if (p === "/api/sessioni" && req.method === "POST") {
-      const { cartella, nome, chat } = await corpoJSON(req);
+      const { cartella, nome, chat, galatea } = await corpoJSON(req);
+
+      // automiglioramento: sessione sul codice sorgente di Galatea stessa
+      if (galatea) {
+        const esistenti = await elencaSessioni();
+        const gia = esistenti.find((s) => s.cartella && resolve(s.cartella).toLowerCase() === resolve(QUI).toLowerCase());
+        if (gia) return json(res, 200, { sessione: { id: gia.id, nome: gia.nome, cartella: gia.cartella } });
+        const sessione = { id: randomUUID(), nome: "✨ Galatea herself", cartella: resolve(QUI), creato: Date.now(), ultimoUso: Date.now(), costo: 0, messaggi: [], eventi: [] };
+        await salvaJSON(fileSessione(sessione.id), sessione);
+        return json(res, 200, { sessione: { id: sessione.id, nome: sessione.nome, cartella: sessione.cartella } });
+      }
 
       // chat pura: nessuna cartella, nessuno strumento
       if (chat) {
