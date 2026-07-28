@@ -248,6 +248,53 @@ function eseguiComando(comando, cwd, segnale) {
   });
 }
 
+/* ------------------------------------------------- attrezzarsi da soli (con approvazione) */
+/* L'agente puo' CERCARE quello che gli manca sui registri pubblici affidabili e leggere
+   le pagine di documentazione. L'INSTALLAZIONE resta un comando: passa sempre dalla
+   conferma esplicita dell'utente, come ogni esegui_comando. */
+
+async function cercaPacchetti(registro, query) {
+  const q = encodeURIComponent(query);
+  const prendi = async (u) => {
+    const r = await fetch(u, { headers: { "user-agent": "free-galatea-code" }, signal: AbortSignal.timeout(10_000) });
+    if (!r.ok) throw new Error(`${u} -> HTTP ${r.status}`);
+    return r.json();
+  };
+  switch (registro) {
+    case "npm": {
+      const d = await prendi(`https://registry.npmjs.org/-/v1/search?text=${q}&size=8`);
+      return (d.objects || []).map((o) => `${o.package.name}@${o.package.version} | ${(o.downloads?.weekly || 0).toLocaleString("en")} dl/week | ${o.package.description || ""} | https://www.npmjs.com/package/${o.package.name}`).join("\n") || "no results";
+    }
+    case "pypi": {
+      try {
+        const d = await prendi(`https://pypi.org/pypi/${q}/json`);
+        return `${d.info.name}==${d.info.version} | ${d.info.summary || ""} | ${d.info.package_url || ""}`;
+      } catch {
+        return `no exact PyPI package named "${query}"; PyPI has no search API, try registro=github with the same query to find the right package name`;
+      }
+    }
+    case "github": {
+      const d = await prendi(`https://api.github.com/search/repositories?q=${q}&sort=stars&per_page=8`);
+      return (d.items || []).map((i) => `${i.full_name} (${i.stargazers_count} stars) | ${i.description || ""} | ${i.html_url}`).join("\n") || "no results";
+    }
+    case "huggingface": {
+      const d = await prendi(`https://huggingface.co/api/models?search=${q}&limit=8&sort=downloads&direction=-1`);
+      return (Array.isArray(d) ? d : []).map((m) => `${m.id} | ${(m.downloads || 0).toLocaleString("en")} downloads, ${m.likes || 0} likes | https://huggingface.co/${m.id}`).join("\n") || "no results";
+    }
+    default:
+      return "unknown registry: use npm, pypi, github or huggingface. For system tools, run 'winget search <name>' via esegui_comando.";
+  }
+}
+
+async function leggiUrl(u) {
+  if (!/^https:\/\//i.test(u)) return "ERROR: https URLs only";
+  const r = await fetch(u, { headers: { "user-agent": "free-galatea-code", accept: "text/plain, text/markdown, text/html, application/json" }, redirect: "follow", signal: AbortSignal.timeout(15_000) });
+  const tipo = r.headers.get("content-type") || "";
+  if (!/text|json|xml|markdown/i.test(tipo)) return `ERROR: content-type ${tipo} not supported (text pages only, no binaries)`;
+  const testo = await r.text();
+  return `HTTP ${r.status} ${tipo}\n\n${testo.slice(0, 80_000)}${testo.length > 80_000 ? "\n...(truncated)" : ""}`;
+}
+
 const STRUMENTI = [
   { type: "function", function: { name: "leggi_file", description: "Reads a text file from the project folder. Use da_riga/quante_righe for large files.", parameters: { type: "object", properties: { percorso: { type: "string" }, da_riga: { type: "integer" }, quante_righe: { type: "integer" } }, required: ["percorso"] } } },
   { type: "function", function: { name: "scrivi_file", description: "Creates or overwrites a file in the project folder (creates subfolders too).", parameters: { type: "object", properties: { percorso: { type: "string" }, contenuto: { type: "string" } }, required: ["percorso", "contenuto"] } } },
@@ -257,6 +304,8 @@ const STRUMENTI = [
   { type: "function", function: { name: "esegui_comando", description: "Runs a PowerShell command in the project folder. The user must APPROVE it in the UI before it runs: propose short commands and explain why in your text.", parameters: { type: "object", properties: { comando: { type: "string" } }, required: ["comando"] } } },
   { type: "function", function: { name: "salva_memoria", description: "Appends a note to persistent memory. ambito 'progetto' = this folder only, 'globale' = all sessions. Use it for stable user preferences and durable project facts, not for current work.", parameters: { type: "object", properties: { testo: { type: "string" }, ambito: { type: "string", enum: ["progetto", "globale"] } }, required: ["testo"] } } },
   { type: "function", function: { name: "trascrivi_audio", description: "Transcribes an audio file from the folder with Groq Whisper (needs the Groq key, max 25 MB).", parameters: { type: "object", properties: { percorso: { type: "string" } }, required: ["percorso"] } } },
+  { type: "function", function: { name: "cerca_pacchetti", description: "Searches trusted public registries for packages/models you may need: npm, pypi, github, huggingface. Returns names, popularity and links. Use it BEFORE proposing an install.", parameters: { type: "object", properties: { registro: { type: "string", enum: ["npm", "pypi", "github", "huggingface"] }, query: { type: "string" } }, required: ["registro", "query"] } } },
+  { type: "function", function: { name: "leggi_url", description: "Fetches a public https page as text (docs, READMEs, registry pages). 80KB max, no binaries. Use it to check a package before installing it.", parameters: { type: "object", properties: { url: { type: "string" } }, required: ["url"] } } },
 ];
 
 async function usaStrumento(nome, args, ctx) {
@@ -332,6 +381,16 @@ async function usaStrumento(nome, args, ctx) {
       const testo = await r.text();
       return r.ok ? mascherato(testo.slice(0, 100_000)) : `ERROR Groq ${r.status}: ${testo.slice(0, 300)}`;
     }
+    case "cerca_pacchetti": {
+      // niente vero(): nelle query verso internet i segnaposto NON vanno tradotti,
+      // cosi' i dati personali non possono uscire nemmeno per sbaglio
+      try { return await cercaPacchetti(args.registro, String(args.query || "")); }
+      catch (e) { return `ERROR: ${e.message}`; }
+    }
+    case "leggi_url": {
+      try { return await leggiUrl(String(args.url || "")); }
+      catch (e) { return `ERROR: ${e.message}`; }
+    }
     default:
       return `unknown tool: ${nome}`;
   }
@@ -380,6 +439,7 @@ Rules:
 - Use modifica_file for small edits, scrivi_file for new files or rewrites.
 - Commands (esegui_comando) only run if the user approves them: propose them one at a time and explain what they are for.
 - When you learn a stable user preference or a durable fact about the project, save it with salva_memoria.
+- EQUIP YOURSELF: if the task needs a capability you do not have (open a PDF, read an image, OCR, convert media...), do not just refuse. Search for a reputable package with cerca_pacchetti (npm, pypi, github, huggingface), check it with leggi_url if useful, then propose the install via esegui_comando (npm install, pip install, winget install). Prefer widely used, actively maintained projects and say in one line why you picked that one. Installs ALWAYS need the user's approval, and after installing verify it works with a quick command.
 - When you finish a piece of work, summarize in a few lines what you touched.${notaAnon}${istruzioniProgetto}
 
 ## Global memory
