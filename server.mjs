@@ -24,6 +24,10 @@ import { randomUUID, createHash } from "node:crypto";
 
 const QUI = dirname(fileURLToPath(import.meta.url));
 const PORTA = process.env.PORT || 4318;
+
+// versione: fonte unica package.json
+let VERSIONE = "0.0.0";
+try { VERSIONE = JSON.parse(await readFile(join(QUI, "package.json"), "utf8")).version || VERSIONE; } catch {}
 const DATI = join(homedir(), ".galatea-code");
 const DIR_SESSIONI = join(DATI, "sessioni");
 const DIR_MEMORIA = join(DATI, "memoria");
@@ -875,6 +879,14 @@ const server = createServer(async (req, res) => {
       return res.end(await readFile(join(QUI, "public", "index.html")));
     }
 
+    // le pixel art del repo, servite anche in locale
+    if (p.startsWith("/art/") && req.method === "GET") {
+      const f = percorsoSicuro(join(QUI, "art"), p.slice(5));
+      if (!existsSync(f) || !f.toLowerCase().endsWith(".svg")) return err(res, "not found", 404);
+      res.writeHead(200, { "Content-Type": "image/svg+xml" });
+      return res.end(await readFile(f));
+    }
+
     if (p === "/api/sessioni" && req.method === "GET") return json(res, 200, { sessioni: await elencaSessioni() });
 
     if (p === "/api/sessioni" && req.method === "POST") {
@@ -1103,14 +1115,17 @@ const server = createServer(async (req, res) => {
 
     /* --- aggiornamento --- */
     if (p === "/api/versione" && req.method === "GET") {
-      let locale = null;
-      try { locale = (await readFile(join(QUI, ".versione"), "utf8")).trim(); } catch {}
+      // la remota si interroga solo su richiesta esplicita, per non bussare a GitHub a ogni apertura
       let remota = null;
-      try {
-        const r = await fetch(REPO_COMMIT_API, { headers: { "user-agent": "free-galatea-code" }, signal: AbortSignal.timeout(10_000) });
-        if (r.ok) { const d = await r.json(); remota = { sha: d.sha?.slice(0, 7), data: d.commit?.committer?.date, messaggio: d.commit?.message?.split("\n")[0] }; }
-      } catch {}
-      return json(res, 200, { locale, remota, git: existsSync(join(QUI, ".git")) });
+      if (url.searchParams.get("remota")) {
+        try {
+          const r = await fetch("https://raw.githubusercontent.com/fedenardi1/free-galatea-code/master/package.json", { headers: { "user-agent": "free-galatea-code" }, signal: AbortSignal.timeout(10_000) });
+          if (r.ok) remota = { versione: (await r.json()).version };
+          const rc = await fetch(REPO_COMMIT_API, { headers: { "user-agent": "free-galatea-code" }, signal: AbortSignal.timeout(10_000) });
+          if (rc.ok) { const d = await rc.json(); remota = { ...(remota || {}), sha: d.sha?.slice(0, 7), data: d.commit?.committer?.date, messaggio: d.commit?.message?.split("\n")[0] }; }
+        } catch {}
+      }
+      return json(res, 200, { locale: VERSIONE, remota, git: existsSync(join(QUI, ".git")) });
     }
     if (p === "/api/aggiorna" && req.method === "POST") {
       try {
@@ -1138,7 +1153,7 @@ const server = createServer(async (req, res) => {
 
 server.listen(PORTA, "127.0.0.1", () => {
   console.log("");
-  console.log("  FREE GALATEA CODE");
+  console.log(`  FREE GALATEA CODE v${VERSIONE}`);
   console.log(`  Aperta su   http://localhost:${PORTA}`);
   console.log(`  Difetti     ${MODELLO_DEFAULT} su ${API_DEFAULT}  -  dati in ${DATI}`);
   console.log("  Ferma con Ctrl+C");

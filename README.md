@@ -23,7 +23,7 @@ Works with **any OpenAI-compatible API**: Kimi K3 on Moonshot (default), OpenRou
 
 *Leggi questa pagina [in italiano](#italiano) più sotto.*
 
-[![Scarica per Windows](https://img.shields.io/badge/%E2%AC%87%EF%B8%8F_INSTALLA_SU_WINDOWS-un_click-cfdc5b?style=for-the-badge&labelColor=323131)](https://github.com/fedenardi1/free-galatea-code/archive/refs/heads/master.zip)
+[![Scarica per Windows](https://img.shields.io/badge/%E2%AC%87%EF%B8%8F_INSTALLA_SU_WINDOWS-un_click-cfdc5b?style=for-the-badge&labelColor=323131)](https://github.com/fedenardi1/free-galatea-code/archive/refs/heads/master.zip) ![version](https://img.shields.io/github/package-json/v/fedenardi1/free-galatea-code?label=version&color=e7ccef&labelColor=323131&style=for-the-badge)
 
 One-line install (Windows PowerShell) that downloads, sets up a desktop shortcut, and launches:
 
@@ -182,6 +182,10 @@ Apri http://localhost:4318, imposta provider e chiave nelle Impostazioni (ingran
 ---
 
 ## Want a serious open project?
+
+<p align="center">
+  <img src="art/galatea-gattino.svg" width="280" alt="pixel art: kawaii Galatea with a grinning Cheshire kitten">
+</p>
 
 This app is a weekend love letter. If you want to see what the Italian open-source AI community builds when it rolls up its sleeves, go meet **[the Cheshire Cat](https://github.com/cheshire-cat-ai/core)** by Piero Savastano: a production-grade, plugin-based framework for AI agents, now at version 2, with one of the warmest open communities around. Vuoi provare un progetto open serio? Vai lì.
 

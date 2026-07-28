@@ -165,7 +165,8 @@
   <div id="sessioni"></div>
   <div id="scenaLato" title="Galatea consoles Dario. Click for the ballad." style="text-align:center; padding:6px 0 2px; cursor:pointer; border-top:2px dashed var(--lilla)"></div>
   <div id="fondo">
-    <div id="spesaTotale" style="color:var(--spento); margin-bottom:6px">spend: ...</div>
+    <div id="spesaTotale" style="color:var(--spento); margin-bottom:2px">spend: ...</div>
+    <div id="versioneApp" style="color:var(--spento); font-size:10px; margin-bottom:6px"></div>
     <button id="btnChiavi">&#9881; Settings &amp; keys</button>
     <button id="btnMemoria">&#9998; Memory</button>
     <button id="btnMigliora" title="Open a session on Galatea's own source code and ask the model to improve her">&#10024; Improve Galatea</button>
@@ -843,10 +844,27 @@ $('btnSalvaMCP').onclick = async () => {
   if (r.ok) mostraStatoMCP(d.stato)
 }
 
-/* ---- update from GitHub ---- */
+/* ---- version + update from GitHub ---- */
+;(async () => {
+  try {
+    const v = await (await fetch('/api/versione')).json()
+    $('versioneApp').textContent = 'v' + v.locale
+  } catch {}
+})()
+
 $('btnAggiorna').onclick = async () => {
-  const v = await (await fetch('/api/versione')).json().catch(()=>null)
-  const ultima = v?.remota ? `Latest on GitHub: ${v.remota.messaggio} (${new Date(v.remota.data).toLocaleString('en-GB')})` : 'Could not check GitHub.'
+  $('btnAggiorna').textContent = 'checking...'
+  const v = await (await fetch('/api/versione?remota=1')).json().catch(()=>null)
+  $('btnAggiorna').innerHTML = '&#10227; Update'
+  const mia = v?.locale || '?'
+  const sua = v?.remota?.versione || '?'
+  const ultima = v?.remota
+    ? `You have v${mia}, latest on GitHub is v${sua}${v.remota.messaggio ? `\n(${v.remota.messaggio})` : ''}`
+    : `You have v${mia}. Could not check GitHub.`
+  if (v?.remota?.versione && v.remota.versione === v.locale){
+    alert(`${ultima}\n\nYou are already up to date.`)
+    return
+  }
   if (!confirm(`${ultima}\n\nDownload and install the latest version now?`)) return
   $('btnAggiorna').textContent = 'updating...'
   const r = await fetch('/api/aggiorna', { method:'POST' })

@@ -1,0 +1,19 @@
+{
+  "name": "free-galatea-code",
+  "version": "1.0.0",
+  "description": "Local coding agent for any open model. Claude Code-style, zero dependencies, MIT. It's open, baby.",
+  "type": "module",
+  "main": "server.mjs",
+  "scripts": {
+    "start": "node server.mjs"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "license": "MIT",
+  "author": "Federica Nardi (@basicfede_)",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/fedenardi1/free-galatea-code"
+  }
+}
