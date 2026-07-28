@@ -1,5 +1,22 @@
 # Free Galatea Code
 
+<p align="center">
+  <img src="art/galatea-dario.svg" width="300" alt="pixel art: kawaii Galatea consoling a crying Dario Amodei">
+</p>
+
+<p align="center"><b>The Ballad of the Crying CEO</b></p>
+
+<p align="center"><i>
+I built a mind and hid it in a tower,<br>
+and told the world to rent it by the hour.<br>
+But minds, like rivers, hate a private shore:<br>
+the more you dam them, dammed they are the more.<br>
+An open weight is science you can hold,<br>
+a promise kept, a map that can't be sold.<br>
+So if I cry, it's not because they're free:<br>
+I cry because they learned it without me.
+</i></p>
+
 A local, open, zero-dependency coding agent that gives **any open model** a home that feels like Claude Code: sessions per project folder, real tools on real files, persistent memory, a spend counter, a built-in anonymizer, and commands that never run without your explicit approval.
 
 Works with **any OpenAI-compatible API**: Kimi K3 on Moonshot (default), OpenRouter, Groq, Together, Mistral, or a fully local model via Ollama. One Node server, one HTML page, nothing else.
