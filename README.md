@@ -72,6 +72,10 @@ Open http://localhost:4318, set provider and key in Settings (gear icon), create
 - Commands run with your user permissions. Approve only what you understand.
 - The pixel tears are not a metric of model quality.
 
+## Mac? Linux? It's open, baby
+
+This was built in one afternoon on Windows, so the launcher (`avvia.cmd`), the installer (`installa.ps1`) and the command tool (PowerShell) are Windows-flavored. Everything else is plain Node plus one browser page and runs anywhere. Want it native on macOS or Linux? **Take all of it, port the three Windows bits, and share it back with the world.** No permission to ask, no license fees, no waiting for a company roadmap: it's MIT licensed. That is the whole point of this repo. It's open, baby.
+
 ---
 
 <a name="italiano"></a>
@@ -137,6 +141,10 @@ Apri http://localhost:4318, imposta provider e chiave nelle Impostazioni (ingran
 - L'anonimizzatore è regex più la tua lista di nomi, non è NER magica: controlla cosa maschera (l'interfaccia te lo mostra) e aggiungi i nomi alla lista.
 - I comandi girano con i tuoi permessi utente: approva solo quello che capisci.
 - Le lacrime in pixel non sono una metrica della qualità del modello.
+
+## Mac? Linux? È open, bellezza
+
+È nata in un pomeriggio su Windows, quindi l'avviatore (`avvia.cmd`), l'installer (`installa.ps1`) e lo strumento comandi (PowerShell) parlano Windows. Tutto il resto è Node puro più una pagina web e gira ovunque. La vuoi nativa su macOS o Linux? **Prenditi tutto, porta i tre pezzi Windows, e ricondividila col mondo.** Nessun permesso da chiedere, nessuna licenza da pagare, nessuna roadmap aziendale da aspettare: è licenza MIT. È tutto il punto di questo repo. È open, bellezza.
 
 ---
 
