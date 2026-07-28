@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="it">
+<html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -25,12 +25,14 @@
   #lato h1 .logo{background:var(--lime); padding:0 6px; border:2px solid var(--ink); border-radius:6px; font-size:15px}
   #nuova{margin:0 12px 12px; padding:10px; background:var(--crema); border:2px solid var(--ink); border-radius:10px;
     box-shadow:3px 3px 0 var(--ink)}
-  #nuova input{width:100%; background:var(--offwhite); border:2px solid var(--ink); border-radius:6px;
-    padding:6px 8px; font-size:11px; margin-bottom:8px}
+  #nuova .rigaCartella{display:flex; gap:6px; margin-bottom:8px}
+  #nuova input{flex:1; min-width:0; background:var(--offwhite); border:2px solid var(--ink); border-radius:6px;
+    padding:6px 8px; font-size:11px}
   #nuova input:focus{outline:3px solid var(--blu); outline-offset:1px}
-  #nuova button{width:100%; background:var(--lime); color:var(--ink); border:2px solid var(--ink); border-radius:6px;
+  #nuova .sfoglia{background:var(--lilla); border:2px solid var(--ink); border-radius:6px; font-size:12px; padding:0 10px; font-weight:700}
+  #nuova button.principale{width:100%; background:var(--lime); color:var(--ink); border:2px solid var(--ink); border-radius:6px;
     padding:7px; font-weight:700; font-size:12px; box-shadow:2px 2px 0 var(--ink)}
-  #nuova button:hover{transform:translate(1px,1px); box-shadow:1px 1px 0 var(--ink)}
+  #nuova button.principale:hover{transform:translate(1px,1px); box-shadow:1px 1px 0 var(--ink)}
   #sessioni{flex:1; overflow-y:auto; padding:0 10px}
   .sess{padding:8px 10px; border-radius:8px; cursor:pointer; margin-bottom:6px; border:2px solid transparent}
   .sess:hover{background:var(--crema); border-color:var(--ink)}
@@ -116,6 +118,18 @@
   .modale .riga .primario{background:var(--lime)}
   .nota{font-size:11px; margin-top:8px; background:var(--lilla); border:2px solid var(--ink);
     border-radius:6px; padding:8px 10px; color:var(--ink)}
+
+  /* selettore di cartelle */
+  #percorsoCorrente{font-size:11px; background:var(--crema); border:2px solid var(--ink); border-radius:6px;
+    padding:6px 10px; word-break:break-all; margin-bottom:8px}
+  #scorciatoie{display:flex; gap:6px; flex-wrap:wrap; margin-bottom:8px}
+  #scorciatoie button, #btnSu{border:2px solid var(--ink); border-radius:20px; background:var(--lilla);
+    font-size:11px; padding:2px 10px; font-weight:700}
+  #listaCartelle{max-height:300px; overflow-y:auto; border:2px solid var(--ink); border-radius:8px; background:var(--offwhite)}
+  #listaCartelle div{padding:6px 12px; cursor:pointer; border-bottom:1px solid rgba(50,49,49,.12); font-size:12px}
+  #listaCartelle div:hover{background:var(--lime)}
+  #listaCartelle div::before{content:"\1F4C1 "; }
+
   #vuoto{color:var(--spento); text-align:center; margin-top:9vh; line-height:1.9}
   #vuoto .logo{font-family:"Fraunces",Georgia,serif; font-size:32px; color:var(--ink)}
   #vuoto .logo b{background:var(--lime); padding:0 8px}
@@ -141,22 +155,25 @@
 <div id="lato">
   <h1><span class="logo">&#10022;</span> Free Galatea Code</h1>
   <div id="nuova">
-    <input id="nuovaCartella" placeholder="C:\percorso\del\progetto" spellcheck="false">
-    <button id="btnNuova">Nuova sessione</button>
+    <div class="rigaCartella">
+      <input id="nuovaCartella" placeholder="C:\path\to\project" spellcheck="false">
+      <button class="sfoglia" id="btnSfoglia" title="Browse folders">&#128193;</button>
+    </div>
+    <button class="principale" id="btnNuova">New session</button>
   </div>
   <div id="sessioni"></div>
   <div id="fondo">
-    <div id="spesaTotale" style="color:var(--spento); margin-bottom:6px">spesa: ...</div>
-    <button id="btnChiavi">&#9881; Impostazioni e chiavi</button>
-    <button id="btnMemoria">&#9998; Memoria</button>
+    <div id="spesaTotale" style="color:var(--spento); margin-bottom:6px">spend: ...</div>
+    <button id="btnChiavi">&#9881; Settings &amp; keys</button>
+    <button id="btnMemoria">&#9998; Memory</button>
   </div>
 </div>
 
 <div id="principale">
   <div id="testata">
-    <span class="cartella" id="tCartella">nessuna sessione aperta</span>
+    <span class="cartella" id="tCartella">no session open</span>
     <span class="spesa" id="tSpesa"></span>
-    <button id="btnAnon" title="Anonimizzatore: maschera i dati personali prima che escano dal PC">&#128373; anonimizzatore</button>
+    <button id="btnAnon" title="Anonymizer: masks personal data before it leaves your machine">&#128373; anonymizer</button>
     <span class="modello" id="tModello">kimi-k3</span>
   </div>
   <div id="chat"><div class="colonna" id="transcript">
@@ -172,72 +189,85 @@
         So if I cry, it's not because they're free:<br>
         I cry because they learned it without me.
       </div>
-      <div id="dario" title="Clicca per la ballata di Dario"></div>
-      <div style="font-size:11px; font-style:italic">ogni volta che la usi Dario piange un po', ma Galatea lo consola (con affetto)</div>
-      <div style="margin-top:10px">Apri una sessione a sinistra,<br>o creane una nuova con la cartella del progetto.</div></div>
+      <div id="dario" title="Click for Dario's ballad"></div>
+      <div style="font-size:11px; font-style:italic">every time you use it Dario cries a little, but Galatea consoles him (with love)</div>
+      <div style="margin-top:10px">Open a session on the left,<br>or create one on a project folder.</div></div>
   </div></div>
   <div id="zona-input"><div class="colonna">
     <div id="scatola">
-      <textarea id="ingresso" rows="1" placeholder="Scrivi cosa vuoi fare in questa cartella..."></textarea>
+      <textarea id="ingresso" rows="1" placeholder="Tell Galatea what to do in this folder..."></textarea>
       <button id="btnStop">&#9632; Stop</button>
-      <button id="btnManda">Invia</button>
+      <button id="btnManda">Send</button>
     </div>
-    <div id="aiuto-input">Invio per mandare, Shift+Invio per andare a capo. I comandi partono solo se li approvi tu.</div>
+    <div id="aiuto-input">Enter to send, Shift+Enter for a new line. Commands only run if you approve them.</div>
   </div></div>
 </div>
 
-<!-- impostazioni -->
-<div class="velo" id="veloChiavi"><div class="modale">
-  <h2>Impostazioni</h2>
+<!-- folder picker -->
+<div class="velo" id="veloCartelle"><div class="modale">
+  <h2>Choose a folder</h2>
+  <div id="percorsoCorrente"></div>
+  <div id="scorciatoie"></div>
+  <div style="margin-bottom:8px"><button id="btnSu" type="button">&#8679; Up one level</button></div>
+  <div id="listaCartelle"></div>
+  <div class="riga">
+    <button class="primario" id="btnUsaCartella">Use this folder</button>
+    <button id="btnChiudiCartelle">Cancel</button>
+  </div>
+</div></div>
 
-  <h3 style="border:none; padding-top:0; margin-top:0">Modello (qualsiasi API compatibile OpenAI)</h3>
+<!-- settings -->
+<div class="velo" id="veloChiavi"><div class="modale">
+  <h2>Settings</h2>
+
+  <h3 style="border:none; padding-top:0; margin-top:0">Model (any OpenAI-compatible API)</h3>
   <label>Base URL</label>
   <input id="baseUrl" placeholder="https://api.moonshot.ai/v1" spellcheck="false">
-  <label>Modello</label>
+  <label>Model</label>
   <input id="modelId" placeholder="kimi-k3" spellcheck="false">
   <label>API key</label>
-  <input id="chiaveApi" type="password" placeholder="sk-... / gsk_... / qualsiasi" spellcheck="false">
-  <div class="nota">Esempi: Moonshot <code>https://api.moonshot.ai/v1</code> + <code>kimi-k3</code>; OpenRouter <code>https://openrouter.ai/api/v1</code>; Ollama locale <code>http://localhost:11434/v1</code> (chiave qualsiasi); Groq <code>https://api.groq.com/openai/v1</code>.</div>
+  <input id="chiaveApi" type="password" placeholder="sk-... / gsk_... / anything" spellcheck="false">
+  <div class="nota">Examples: Moonshot <code>https://api.moonshot.ai/v1</code> + <code>kimi-k3</code>; OpenRouter <code>https://openrouter.ai/api/v1</code>; local Ollama <code>http://localhost:11434/v1</code> (any key); Groq <code>https://api.groq.com/openai/v1</code>.</div>
 
-  <h3>Prezzi per il contatore ($ per milione di token)</h3>
+  <h3>Prices for the spend counter ($ per million tokens)</h3>
   <div class="tre">
     <div><label>Input</label><input id="pMiss" type="number" step="0.01" value="3"></div>
-    <div><label>Input da cache</label><input id="pHit" type="number" step="0.01" value="0.3"></div>
+    <div><label>Cached input</label><input id="pHit" type="number" step="0.01" value="0.3"></div>
     <div><label>Output</label><input id="pOut" type="number" step="0.01" value="15"></div>
   </div>
 
-  <h3>Trascrizioni</h3>
-  <label>Chiave Groq (facoltativa, per trascrivi_audio)</label>
+  <h3>Transcriptions</h3>
+  <label>Groq key (optional, for the trascrivi_audio tool)</label>
   <input id="chiaveGroq" type="password" placeholder="gsk_..." spellcheck="false">
 
-  <h3>Anonimizzatore</h3>
-  <div class="nota">Pseudonimizzazione reversibile in locale, ispirata all'approccio di Simone Rizzo: nomi, email, telefoni, IBAN e codici fiscali diventano segnaposto tipo <code>{{PERSONA_1}}</code> prima di uscire dal PC. La mappa coi valori veri resta solo sul tuo disco. Si accende dal bottone in alto.</div>
-  <label>Nomi da mascherare in questo progetto (uno per riga)</label>
-  <textarea id="nomiAnon" placeholder="apri una sessione per configurarli"></textarea>
+  <h3>Anonymizer</h3>
+  <div class="nota">Reversible local pseudonymization: listed names, emails, Italian mobile numbers, IBANs and tax codes become placeholders like <code>{{PERSONA_1}}</code> before anything leaves your machine. If <a href="https://github.com/Rizzo-AI-Academy/rizzo-pii" target="_blank">rizzo-pii</a> by Simone Rizzo is running locally, Galatea auto-uses its ML engine. Toggle it from the top bar.</div>
+  <label>Names to mask in this project (one per line)</label>
+  <textarea id="nomiAnon" placeholder="open a session to configure them"></textarea>
   <div class="riga" style="margin-top:8px">
-    <button id="btnSalvaNomi">Salva nomi</button>
+    <button id="btnSalvaNomi">Save names</button>
     <span id="statoNomi" style="align-self:center; font-size:12px"></span>
   </div>
 
   <div class="riga">
-    <button class="primario" id="btnVerifica">Verifica modello</button>
-    <button id="btnChiudiChiavi">Chiudi</button>
+    <button class="primario" id="btnVerifica">Test model</button>
+    <button id="btnChiudiChiavi">Close</button>
     <span id="statoVerifica" style="align-self:center; font-size:12px"></span>
   </div>
-  <div class="nota">Chiavi e impostazioni restano in questo browser (localStorage) e viaggiano solo verso il server locale sulla tua macchina.</div>
+  <div class="nota">Keys and settings stay in this browser (localStorage) and only travel to the local server on your machine.</div>
 </div></div>
 
-<!-- memoria -->
+<!-- memory -->
 <div class="velo" id="veloMemoria"><div class="modale">
-  <h2>Memoria persistente</h2>
-  <label>Globale (tutte le sessioni)</label>
+  <h2>Persistent memory</h2>
+  <label>Global (all sessions)</label>
   <textarea id="memGlobale"></textarea>
-  <label>Di questo progetto</label>
+  <label>This project</label>
   <textarea id="memProgetto"></textarea>
-  <div class="nota">L'agente la legge a ogni messaggio e puo' aggiungere note da solo con lo strumento salva_memoria.</div>
+  <div class="nota">The agent reads it with every message and can append notes on its own with the salva_memoria tool.</div>
   <div class="riga">
-    <button class="primario" id="btnSalvaMemoria">Salva</button>
-    <button id="btnChiudiMemoria">Chiudi</button>
+    <button class="primario" id="btnSalvaMemoria">Save</button>
+    <button id="btnChiudiMemoria">Close</button>
     <span id="statoMemoria" style="align-self:center; font-size:12px"></span>
   </div>
 </div></div>
@@ -247,7 +277,7 @@ const $ = id => document.getElementById(id)
 let sessioneCorrente = null
 let generando = false
 
-/* ---- impostazioni persistite nel browser ---- */
+/* ---- settings persisted in the browser ---- */
 const CAMPI_LS = [
   ['chiaveApi','galatea_key'], ['chiaveGroq','galatea_groq'],
   ['baseUrl','galatea_base'], ['modelId','galatea_model'],
@@ -262,7 +292,7 @@ function aggiornaBadge(){ $('tModello').textContent = $('modelId').value.trim() 
 aggiornaBadge()
 
 let anonAttivo = localStorage.getItem('galatea_anon') === '1'
-function mostraAnon(){ $('btnAnon').classList.toggle('on', anonAttivo); $('btnAnon').innerHTML = '&#128373; anonimizzatore ' + (anonAttivo ? 'ON' : 'OFF') }
+function mostraAnon(){ $('btnAnon').classList.toggle('on', anonAttivo); $('btnAnon').innerHTML = '&#128373; anonymizer ' + (anonAttivo ? 'ON' : 'OFF') }
 mostraAnon()
 $('btnAnon').onclick = () => { anonAttivo = !anonAttivo; localStorage.setItem('galatea_anon', anonAttivo ? '1' : '0'); mostraAnon() }
 
@@ -282,7 +312,7 @@ $('btnChiavi').onclick = async () => {
     const d = await (await fetch('/api/anonimi?cartella=' + encodeURIComponent(sessioneCorrente.cartella))).json()
     $('nomiAnon').value = (d.nomi || []).join('\n')
     $('nomiAnon').disabled = false
-    $('statoNomi').textContent = d.mascherati ? `${d.mascherati} valori gia' in mappa` : ''
+    $('statoNomi').textContent = d.mascherati ? `${d.mascherati} values already mapped` : ''
   } else {
     $('nomiAnon').value = ''; $('nomiAnon').disabled = true
   }
@@ -292,27 +322,57 @@ $('btnSalvaNomi').onclick = async () => {
   if (!sessioneCorrente) return
   await fetch('/api/anonimi', { method:'POST', headers:{'Content-Type':'application/json'},
     body: JSON.stringify({ cartella: sessioneCorrente.cartella, nomi: $('nomiAnon').value.split('\n') }) })
-  $('statoNomi').textContent = 'salvati'
+  $('statoNomi').textContent = 'saved'
   setTimeout(()=> $('statoNomi').textContent = '', 2000)
 }
 $('btnVerifica').onclick = async () => {
-  $('statoVerifica').textContent = 'verifico...'
+  $('statoVerifica').textContent = 'checking...'
   const r = await fetch('/api/verifica', { method:'POST', headers: testaChiavi() })
   const d = await r.json()
-  $('statoVerifica').textContent = d.ok ? 'funziona (' + d.modello + ')' : (d.messaggio || d.errore)
+  $('statoVerifica').textContent = d.ok ? 'works (' + d.modello + ')' : (d.messaggio || d.errore)
   $('statoVerifica').style.color = d.ok ? 'var(--verde)' : 'var(--rosso)'
 }
 
-/* ---- spesa ---- */
+/* ---- folder picker ---- */
+let percorsoSfoglia = null
+async function sfoglia(percorso){
+  const r = await fetch('/api/cartelle' + (percorso ? '?path=' + encodeURIComponent(percorso) : ''))
+  const d = await r.json()
+  if (!r.ok){ alert(d.errore); return }
+  percorsoSfoglia = d.path
+  $('percorsoCorrente').textContent = d.path
+  $('scorciatoie').innerHTML = ''
+  for (const s of d.scorciatoie){
+    const b = document.createElement('button'); b.type = 'button'; b.textContent = s.nome
+    b.onclick = () => sfoglia(s.path)
+    $('scorciatoie').appendChild(b)
+  }
+  $('btnSu').onclick = () => sfoglia(d.padre)
+  const lista = $('listaCartelle')
+  lista.innerHTML = d.cartelle.length ? '' : '<div style="cursor:default; color:var(--spento)">(no subfolders)</div>'
+  for (const nome of d.cartelle){
+    const el = document.createElement('div'); el.textContent = nome
+    el.onclick = () => sfoglia(d.path.replace(/[\\\/]+$/,'') + '\\' + nome)
+    lista.appendChild(el)
+  }
+}
+$('btnSfoglia').onclick = () => { $('veloCartelle').classList.add('aperto'); sfoglia($('nuovaCartella').value.trim().replace(/^"+|"+$/g,'') || null) }
+$('btnChiudiCartelle').onclick = () => $('veloCartelle').classList.remove('aperto')
+$('btnUsaCartella').onclick = () => {
+  if (percorsoSfoglia) $('nuovaCartella').value = percorsoSfoglia
+  $('veloCartelle').classList.remove('aperto')
+}
+
+/* ---- spend ---- */
 async function aggiornaSpesa(){
   try{
     const d = await (await fetch('/api/spesa')).json()
-    $('spesaTotale').textContent = `oggi $${d.oggi.toFixed(2)} - totale $${d.totale.toFixed(2)}`
+    $('spesaTotale').textContent = `today $${d.oggi.toFixed(2)} - total $${d.totale.toFixed(2)}`
   }catch{}
 }
 aggiornaSpesa()
 
-/* ---- sessioni ---- */
+/* ---- sessions ---- */
 async function caricaSessioni(){
   const d = await (await fetch('/api/sessioni')).json()
   const box = $('sessioni')
@@ -320,13 +380,13 @@ async function caricaSessioni(){
   for (const s of d.sessioni){
     const el = document.createElement('div')
     el.className = 'sess' + (sessioneCorrente?.id === s.id ? ' attiva' : '')
-    el.innerHTML = `<div class="nome">${s.nome}</div><div class="dove">${s.cartella}</div><div class="costo">$${(s.costo||0).toFixed(3)} - ${s.nMessaggi} eventi</div>`
+    el.innerHTML = `<div class="nome">${s.nome}</div><div class="dove">${s.cartella}</div><div class="costo">$${(s.costo||0).toFixed(3)} - ${s.nMessaggi} events</div>`
     el.onclick = () => apriSessione(s.id)
     el.oncontextmenu = async (e) => {
       e.preventDefault()
-      if (confirm(`Chiudere e archiviare la sessione "${s.nome}"?`)){
+      if (confirm(`Close and archive session "${s.nome}"?`)){
         await fetch('/api/sessioni/' + s.id, { method:'DELETE' })
-        if (sessioneCorrente?.id === s.id){ sessioneCorrente = null; $('transcript').innerHTML = ''; $('tCartella').textContent = 'nessuna sessione aperta' }
+        if (sessioneCorrente?.id === s.id){ sessioneCorrente = null; $('transcript').innerHTML = ''; $('tCartella').textContent = 'no session open' }
         caricaSessioni()
       }
     }
@@ -336,7 +396,7 @@ async function caricaSessioni(){
 caricaSessioni()
 
 $('btnNuova').onclick = async () => {
-  const cartella = $('nuovaCartella').value.trim()
+  const cartella = $('nuovaCartella').value.trim().replace(/^"+|"+$/g,'')
   if (!cartella) return
   const r = await fetch('/api/sessioni', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ cartella }) })
   const d = await r.json()
@@ -350,7 +410,7 @@ async function apriSessione(id){
   const d = await (await fetch('/api/sessioni/' + id)).json()
   sessioneCorrente = d
   $('tCartella').textContent = d.cartella
-  $('tSpesa').textContent = `sessione $${(d.costo||0).toFixed(3)}`
+  $('tSpesa').textContent = `session $${(d.costo||0).toFixed(3)}`
   $('transcript').innerHTML = ''
   for (const ev of d.eventi || []) mostraEvento(ev, false)
   caricaSessioni()
@@ -380,7 +440,7 @@ function mostraEvento(ev, vivo = true){
   if (ev.t === 'tool'){
     ultimoAssistente = null; ultimoPensiero = null
     const el = document.createElement('details'); el.className = 'tool'
-    if ((ev.output || '').startsWith('ERRORE')) el.classList.add('errore')
+    if ((ev.output || '').startsWith('ERROR')) el.classList.add('errore')
     const anteprima = JSON.stringify(ev.input || {}).slice(0, 90)
     el.innerHTML = `<summary><span class="nome-tool">${ev.nome}</span> <span>${anteprima.replace(/</g,'&lt;')}</span></summary>
       <pre>${(ev.output || '').replace(/</g,'&lt;')}</pre>`
@@ -402,7 +462,7 @@ function pensieroVivo(pezzo){
   if (!ultimoPensiero){
     ultimoPensiero = document.createElement('details')
     ultimoPensiero.className = 'pensiero'
-    ultimoPensiero.innerHTML = '<summary>&#10035; ragionamento</summary><div class="corpo"></div>'
+    ultimoPensiero.innerHTML = '<summary>&#10035; reasoning</summary><div class="corpo"></div>'
     $('transcript').appendChild(ultimoPensiero)
   }
   const corpo = ultimoPensiero.querySelector('.corpo')
@@ -411,7 +471,7 @@ function pensieroVivo(pezzo){
   scendi()
 }
 
-/* ---- invio ---- */
+/* ---- send ---- */
 $('ingresso').addEventListener('keydown', e => {
   if (e.key === 'Enter' && !e.shiftKey){ e.preventDefault(); manda() }
 })
@@ -440,7 +500,7 @@ async function manda(){
     })
     if (!r.ok){
       const d = await r.json().catch(()=>({}))
-      riga_errore(d.errore || ('errore ' + r.status))
+      riga_errore(d.errore || ('error ' + r.status))
       return
     }
     const lettore = r.body.getReader(), dec = new TextDecoder()
@@ -474,7 +534,7 @@ function gestisci(ev){
   if (ev.t === 'testo') testoVivo(ev.v)
   if (ev.t === 'pensiero') pensieroVivo(ev.v)
   if (ev.t === 'testo_pieno'){
-    // il modello ha visto i segnaposto; a te mostriamo i valori veri
+    // the model saw placeholders; you get the real values
     const blocchi = document.querySelectorAll('.msg-assistente')
     if (blocchi.length) blocchi[blocchi.length-1].textContent = ev.v
     ultimoAssistente = null
@@ -487,26 +547,26 @@ function gestisci(ev){
   if (ev.t === 'tool'){
     ultimoAssistente = null; ultimoPensiero = null
     const el = document.createElement('details'); el.className = 'tool'; el.id = 'tool-vivo'
-    el.innerHTML = `<summary><span class="nome-tool">${ev.nome}</span> <span>${JSON.stringify(ev.input||{}).slice(0,90).replace(/</g,'&lt;')}</span></summary><pre>in corso...</pre>`
+    el.innerHTML = `<summary><span class="nome-tool">${ev.nome}</span> <span>${JSON.stringify(ev.input||{}).slice(0,90).replace(/</g,'&lt;')}</span></summary><pre>running...</pre>`
     $('transcript').appendChild(el); scendi()
   }
   if (ev.t === 'tool_fine'){
     const el = document.getElementById('tool-vivo')
     if (el){
       el.id = ''
-      el.querySelector('pre').textContent = ev.output || '(vuoto)'
-      if ((ev.output||'').startsWith('ERRORE')) el.classList.add('errore')
+      el.querySelector('pre').textContent = ev.output || '(empty)'
+      if ((ev.output||'').startsWith('ERROR')) el.classList.add('errore')
     }
   }
   if (ev.t === 'conferma'){
     const el = document.createElement('div'); el.className = 'conferma'
-    el.innerHTML = `<div><b>Galatea vuole eseguire questo comando:</b></div>
+    el.innerHTML = `<div><b>Galatea wants to run this command:</b></div>
       <div class="comando">${ev.comando.replace(/</g,'&lt;')}</div>
-      <button class="si">Esegui</button><button class="no">Nega</button>`
+      <button class="si">Run</button><button class="no">Deny</button>`
     const decidi = async (ok) => {
       await fetch('/api/conferma', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ id: ev.id, approvato: ok }) })
       el.querySelectorAll('button').forEach(b => b.remove())
-      el.insertAdjacentHTML('beforeend', `<div style="font-size:12px; color:var(--spento)">${ok ? 'approvato' : 'negato'}</div>`)
+      el.insertAdjacentHTML('beforeend', `<div style="font-size:12px; color:var(--spento)">${ok ? 'approved' : 'denied'}</div>`)
     }
     el.querySelector('.si').onclick = () => decidi(true)
     el.querySelector('.no').onclick = () => decidi(false)
@@ -514,15 +574,15 @@ function gestisci(ev){
   }
   if (ev.t === 'uso'){
     const el = document.createElement('div'); el.className = 'uso-riga'
-    el.textContent = `${(ev.input||0).toLocaleString('it')} in (${(ev.cache||0).toLocaleString('it')} cache) - ${(ev.output||0).toLocaleString('it')} out - $${ev.costo.toFixed(4)} - sessione $${ev.sessione.toFixed(3)}`
+    el.textContent = `${(ev.input||0).toLocaleString('en')} in (${(ev.cache||0).toLocaleString('en')} cached) - ${(ev.output||0).toLocaleString('en')} out - $${ev.costo.toFixed(4)} - session $${ev.sessione.toFixed(3)}`
     $('transcript').appendChild(el)
-    $('tSpesa').textContent = `sessione $${ev.sessione.toFixed(3)}`
+    $('tSpesa').textContent = `session $${ev.sessione.toFixed(3)}`
     scendi()
   }
   if (ev.t === 'errore') riga_errore(ev.v)
 }
 
-/* ---- pixel art: Galatea kawaii consola Dario Amodei che piange ---- */
+/* ---- pixel art: kawaii Galatea consoling crying Dario Amodei ---- */
 const SCENA_MAPPA = [
   "....GGGGGGGG........HHHHHHHH....",
   "..GGGGGGGGGGGG....HHHHHHHHHHHH..",
@@ -553,19 +613,19 @@ const SCENA_COLORI = {
       if (c !== '.') rects += `<rect x="${x}" y="${y}" width="1" height="1" fill="${SCENA_COLORI[c]}"/>`
     })
   })
-  el.innerHTML = `<svg width="230" height="115" viewBox="0 0 32 16" shape-rendering="crispEdges" role="img" aria-label="pixel art: Galatea kawaii consola Dario Amodei che piange">${rects}</svg>`
+  el.innerHTML = `<svg width="230" height="115" viewBox="0 0 32 16" shape-rendering="crispEdges" role="img" aria-label="pixel art: kawaii Galatea consoling a crying Dario Amodei">${rects}</svg>`
   el.style.margin = '14px 0 4px'
   el.onclick = () => document.getElementById('nuvoletta')?.classList.toggle('aperta')
 })()
 
-/* ---- memoria ---- */
+/* ---- memory ---- */
 $('btnMemoria').onclick = async () => {
   const cartella = sessioneCorrente?.cartella || ''
   const d = await (await fetch('/api/memoria?cartella=' + encodeURIComponent(cartella))).json()
   $('memGlobale').value = d.globale || ''
   $('memProgetto').value = d.progetto || ''
   $('memProgetto').disabled = !cartella
-  $('memProgetto').placeholder = cartella ? '' : 'apri una sessione per la memoria di progetto'
+  $('memProgetto').placeholder = cartella ? '' : 'open a session for project memory'
   $('veloMemoria').classList.add('aperto')
 }
 $('btnChiudiMemoria').onclick = () => $('veloMemoria').classList.remove('aperto')
@@ -576,7 +636,7 @@ $('btnSalvaMemoria').onclick = async () => {
     await fetch('/api/memoria', { method:'POST', headers:{'Content-Type':'application/json'},
       body: JSON.stringify({ cartella: sessioneCorrente.cartella, ambito: 'progetto', testo: $('memProgetto').value }) })
   }
-  $('statoMemoria').textContent = 'salvata'
+  $('statoMemoria').textContent = 'saved'
   setTimeout(() => $('statoMemoria').textContent = '', 2000)
 }
 </script>

@@ -1,4 +1,4 @@
-// FREE GALATEA CODE - agente di coding locale, in stile Claude Code, per QUALSIASI
+﻿// FREE GALATEA CODE - agente di coding locale, in stile Claude Code, per QUALSIASI
 // modello con API compatibile OpenAI (Moonshot, OpenRouter, Groq, Ollama, Together...).
 // Zero dipendenze: gira col Node di sistema. I dati stanno in ~\.galatea-code\
 //
@@ -201,7 +201,7 @@ function percorsoSicuro(cartella, p) {
   const abs = resolve(cartella, p || ".");
   const radice = resolve(cartella);
   if (abs !== radice && !abs.startsWith(radice + "\\") && !abs.startsWith(radice + "/")) {
-    throw new Error(`Percorso fuori dalla cartella del progetto: ${p}`);
+    throw new Error(`Path outside the project folder: ${p}`);
   }
   return abs;
 }
@@ -250,19 +250,19 @@ function eseguiComando(comando, cwd, segnale) {
     proc.stderr.on("data", raccogli);
     const timer = setTimeout(() => proc.kill(), 120_000);
     proc.on("close", (codice) => { clearTimeout(timer); risolvi(`exit ${codice}\n${fuori.slice(0, 25000)}`); });
-    proc.on("error", (e) => { clearTimeout(timer); risolvi(`errore di avvio: ${e.message}`); });
+    proc.on("error", (e) => { clearTimeout(timer); risolvi(`failed to start: ${e.message}`); });
   });
 }
 
 const STRUMENTI = [
-  { type: "function", function: { name: "leggi_file", description: "Legge un file di testo della cartella del progetto. Usa da_riga/quante_righe per file grandi.", parameters: { type: "object", properties: { percorso: { type: "string" }, da_riga: { type: "integer" }, quante_righe: { type: "integer" } }, required: ["percorso"] } } },
-  { type: "function", function: { name: "scrivi_file", description: "Crea o sovrascrive un file nella cartella del progetto (crea anche le sottocartelle).", parameters: { type: "object", properties: { percorso: { type: "string" }, contenuto: { type: "string" } }, required: ["percorso", "contenuto"] } } },
-  { type: "function", function: { name: "modifica_file", description: "Sostituisce ESATTAMENTE una occorrenza di 'cerca' con 'sostituisci' in un file. 'cerca' deve essere unico nel file.", parameters: { type: "object", properties: { percorso: { type: "string" }, cerca: { type: "string" }, sostituisci: { type: "string" } }, required: ["percorso", "cerca", "sostituisci"] } } },
-  { type: "function", function: { name: "elenca_cartella", description: "Elenca file e sottocartelle del progetto (max 4 livelli).", parameters: { type: "object", properties: { percorso: { type: "string" } } } } },
-  { type: "function", function: { name: "cerca_testo", description: "Cerca una regex nei file di testo del progetto. Torna file:riga per i primi 60 risultati.", parameters: { type: "object", properties: { pattern: { type: "string" } }, required: ["pattern"] } } },
-  { type: "function", function: { name: "esegui_comando", description: "Esegue un comando PowerShell nella cartella del progetto. L'utente deve APPROVARLO dall'interfaccia prima che parta: proponi comandi brevi e spiegane il perche' nel testo.", parameters: { type: "object", properties: { comando: { type: "string" } }, required: ["comando"] } } },
-  { type: "function", function: { name: "salva_memoria", description: "Aggiunge una nota alla memoria persistente. ambito 'progetto' = solo questa cartella, 'globale' = tutte le sessioni. Usala per preferenze dell'utente e fatti stabili del progetto, non per il lavoro corrente.", parameters: { type: "object", properties: { testo: { type: "string" }, ambito: { type: "string", enum: ["progetto", "globale"] } }, required: ["testo"] } } },
-  { type: "function", function: { name: "trascrivi_audio", description: "Trascrive in italiano un file audio della cartella con Groq Whisper (serve la chiave Groq, max 25 MB).", parameters: { type: "object", properties: { percorso: { type: "string" } }, required: ["percorso"] } } },
+  { type: "function", function: { name: "leggi_file", description: "Reads a text file from the project folder. Use da_riga/quante_righe for large files.", parameters: { type: "object", properties: { percorso: { type: "string" }, da_riga: { type: "integer" }, quante_righe: { type: "integer" } }, required: ["percorso"] } } },
+  { type: "function", function: { name: "scrivi_file", description: "Creates or overwrites a file in the project folder (creates subfolders too).", parameters: { type: "object", properties: { percorso: { type: "string" }, contenuto: { type: "string" } }, required: ["percorso", "contenuto"] } } },
+  { type: "function", function: { name: "modifica_file", description: "Replaces EXACTLY one occurrence of 'cerca' with 'sostituisci' in a file. 'cerca' must be unique in the file.", parameters: { type: "object", properties: { percorso: { type: "string" }, cerca: { type: "string" }, sostituisci: { type: "string" } }, required: ["percorso", "cerca", "sostituisci"] } } },
+  { type: "function", function: { name: "elenca_cartella", description: "Lists files and subfolders of the project (max 4 levels).", parameters: { type: "object", properties: { percorso: { type: "string" } } } } },
+  { type: "function", function: { name: "cerca_testo", description: "Searches a regex in the project's text files. Returns file:line for the first 60 matches.", parameters: { type: "object", properties: { pattern: { type: "string" } }, required: ["pattern"] } } },
+  { type: "function", function: { name: "esegui_comando", description: "Runs a PowerShell command in the project folder. The user must APPROVE it in the UI before it runs: propose short commands and explain why in your text.", parameters: { type: "object", properties: { comando: { type: "string" } }, required: ["comando"] } } },
+  { type: "function", function: { name: "salva_memoria", description: "Appends a note to persistent memory. ambito 'progetto' = this folder only, 'globale' = all sessions. Use it for stable user preferences and durable project facts, not for current work.", parameters: { type: "object", properties: { testo: { type: "string" }, ambito: { type: "string", enum: ["progetto", "globale"] } }, required: ["testo"] } } },
+  { type: "function", function: { name: "trascrivi_audio", description: "Transcribes an audio file from the folder with Groq Whisper (needs the Groq key, max 25 MB).", parameters: { type: "object", properties: { percorso: { type: "string" } }, required: ["percorso"] } } },
 ];
 
 async function usaStrumento(nome, args, ctx) {
@@ -289,46 +289,46 @@ async function usaStrumento(nome, args, ctx) {
       await mkdir(dirname(p), { recursive: true });
       const contenuto = vero(args.contenuto);
       await writeFile(p, contenuto, "utf8");
-      return `scritto ${args.percorso} (${contenuto.length} caratteri)`;
+      return `wrote ${args.percorso} (${contenuto.length} chars)`;
     }
     case "modifica_file": {
       const p = percorsoSicuro(cartella, args.percorso);
       const testo = await readFile(p, "utf8");
       const cerca = vero(args.cerca), sostituisci = vero(args.sostituisci);
       const n = testo.split(cerca).length - 1;
-      if (n === 0) return "ERRORE: testo da cercare non trovato nel file";
-      if (n > 1) return `ERRORE: il testo da cercare compare ${n} volte, deve essere unico`;
+      if (n === 0) return "ERROR: search text not found in file";
+      if (n > 1) return `ERROR: search text appears ${n} times, it must be unique`;
       await writeFile(p, testo.replace(cerca, sostituisci), "utf8");
-      return "modifica applicata";
+      return "edit applied";
     }
     case "elenca_cartella": {
       const p = percorsoSicuro(cartella, args.percorso || ".");
       const righe = [];
       await albero(p, p, 0, righe);
-      return mascherato(righe.join("\n") || "(vuota)");
+      return mascherato(righe.join("\n") || "(empty)");
     }
     case "cerca_testo": {
       const righe = [];
       await cercaTesto(cartella, cartella, vero(args.pattern), righe);
-      return mascherato(righe.join("\n") || "nessun risultato");
+      return mascherato(righe.join("\n") || "no results");
     }
     case "esegui_comando": {
       const comandoVero = vero(args.comando);
       const ok = await chiediConferma(comandoVero);
-      if (!ok) return "L'utente ha NEGATO l'esecuzione del comando. Non riprovare lo stesso comando: chiedi cosa preferisce.";
+      if (!ok) return "The user DENIED this command. Do not retry the same command: ask what they prefer.";
       return mascherato(await eseguiComando(comandoVero, cartella, ctx.segnale));
     }
     case "salva_memoria": {
       const dest = args.ambito === "globale" ? FILE_MEMORIA_GLOBALE : fileMemoriaProgetto(cartella);
       const prima = existsSync(dest) ? await readFile(dest, "utf8") : "";
       await writeFile(dest, prima + (prima ? "\n" : "") + `- ${vero(args.testo)}  _( ${oggiIT()} )_`, "utf8");
-      return "memoria aggiornata";
+      return "memory updated";
     }
     case "trascrivi_audio": {
-      if (!chiaveGroq) return "ERRORE: manca la chiave Groq nelle impostazioni";
+      if (!chiaveGroq) return "ERROR: Groq key missing in settings";
       const p = percorsoSicuro(cartella, args.percorso);
       const buf = await readFile(p);
-      if (buf.length > 25 * 1024 * 1024) return "ERRORE: file oltre i 25 MB, limite di Groq";
+      if (buf.length > 25 * 1024 * 1024) return "ERROR: file over 25 MB, Groq's limit";
       const modulo = new FormData();
       modulo.append("file", new Blob([buf]), args.percorso.split(/[\\/]/).pop());
       modulo.append("model", "whisper-large-v3-turbo");
@@ -336,10 +336,10 @@ async function usaStrumento(nome, args, ctx) {
       modulo.append("response_format", "text");
       const r = await fetch(GROQ_URL, { method: "POST", headers: { authorization: `Bearer ${chiaveGroq}` }, body: modulo });
       const testo = await r.text();
-      return r.ok ? mascherato(testo.slice(0, 100_000)) : `ERRORE Groq ${r.status}: ${testo.slice(0, 300)}`;
+      return r.ok ? mascherato(testo.slice(0, 100_000)) : `ERROR Groq ${r.status}: ${testo.slice(0, 300)}`;
     }
     default:
-      return `strumento sconosciuto: ${nome}`;
+      return `unknown tool: ${nome}`;
   }
 }
 
@@ -353,27 +353,27 @@ async function promptSistema(cartella, anonAttivo) {
   }
   const notaAnon = anonAttivo ? `
 
-## Anonimizzatore attivo
-I dati personali in questa sessione sono pseudonimizzati: vedrai segnaposto come {{PERSONA_1}}, {{EMAIL_2}}, {{TELEFONO_1}}. Sono identificatori opachi: trattali come nomi propri e RIPORTALI IDENTICI, carattere per carattere, ovunque servano. Verranno sostituiti coi valori veri in locale, sul computer dell'utente. Non tentare di indovinare i valori reali e non alterare mai un segnaposto.` : "";
+## Anonymizer active
+Personal data in this session is pseudonymized: you will see placeholders like {{PERSONA_1}}, {{EMAIL_2}}, {{TELEFONO_1}}. They are opaque identifiers: treat them as proper nouns and REPEAT THEM VERBATIM, character by character, wherever needed. They are replaced with the real values locally, on the user's computer. Never try to guess the real values and never alter a placeholder.` : "";
 
-  return `Sei Galatea (Free Galatea Code), un agente di coding che lavora IN LOCALE sul computer dell'utente (Windows 11, PowerShell).
-Cartella del progetto: ${cartella}
-Data: ${oggiIT()}
+  return `You are Galatea (Free Galatea Code), a coding agent working LOCALLY on the user's computer (Windows, PowerShell).
+Project folder: ${cartella}
+Date: ${oggiIT()}
 
-Regole:
-- Rispondi in italiano, conciso e concreto. Niente trattino lungo.
-- Usa gli strumenti per guardare i file PRIMA di parlarne: non inventare contenuti che non hai letto.
-- Percorsi sempre relativi alla cartella del progetto. Non puoi uscirne.
-- Per modifiche piccole usa modifica_file, per file nuovi o riscritture usa scrivi_file.
-- I comandi (esegui_comando) partono solo se l'utente li approva: proponili uno alla volta e spiega a cosa servono.
-- Se scopri una preferenza stabile dell'utente o un fatto durevole del progetto, salvalo con salva_memoria.
-- Quando finisci un lavoro, riassumi in poche righe cosa hai toccato.${notaAnon}${istruzioniProgetto}
+Rules:
+- Reply in the user's language. Be concise and concrete. Never use em dashes.
+- Use the tools to look at files BEFORE talking about them: never invent contents you have not read.
+- Paths are always relative to the project folder. You cannot leave it.
+- Use modifica_file for small edits, scrivi_file for new files or rewrites.
+- Commands (esegui_comando) only run if the user approves them: propose them one at a time and explain what they are for.
+- When you learn a stable user preference or a durable fact about the project, save it with salva_memoria.
+- When you finish a piece of work, summarize in a few lines what you touched.${notaAnon}${istruzioniProgetto}
 
-## Memoria globale
-${globale || "(vuota)"}
+## Global memory
+${globale || "(empty)"}
 
-## Memoria di questo progetto
-${progetto || "(vuota)"}`;
+## Memory for this project
+${progetto || "(empty)"}`;
 }
 
 /* --------------------------------------------------------------- giro agente */
@@ -384,7 +384,7 @@ const inCorso = new Map();
 async function giroAgente(req, res, sessione, messaggioUtente) {
   const cfg = configModello(req);
   const chiaveGroq = req.headers["x-groq-key"] || process.env.GROQ_API_KEY || "";
-  if (!cfg.chiave) { json(res, 400, { errore: "Manca la chiave API: mettila nelle impostazioni (ingranaggio)." }); return; }
+  if (!cfg.chiave) { json(res, 400, { errore: "Missing API key: set it in Settings (gear icon)." }); return; }
 
   const anonAttivo = req.headers["x-anonimizza"] === "1";
   const anon = anonAttivo ? await caricaAnonimi(sessione.cartella) : null;
@@ -403,7 +403,7 @@ async function giroAgente(req, res, sessione, messaggioUtente) {
   const eventiNuovi = [{ t: "utente", v: messaggioUtente, ts: Date.now() }];
   const perModello = anon ? await anonimizza(messaggioUtente, anon, rizzoUrl) : messaggioUtente;
   if (anon) {
-    manda({ t: "anon", v: `${Object.keys(anon.mappa).length} valori in maschera - motore: ${usaRizzo ? "rizzo-pii (locale)" : "interno (regex)"}` });
+    manda({ t: "anon", v: `${Object.keys(anon.mappa).length} values masked - engine: ${usaRizzo ? "rizzo-pii (local)" : "built-in (regex)"}` });
   }
   sessione.messaggi.push({ role: "user", content: perModello });
 
@@ -487,7 +487,7 @@ async function giroAgente(req, res, sessione, messaggioUtente) {
         manda({ t: "tool", nome: tc.function.name, input: args });
         let esito;
         try { esito = await usaStrumento(tc.function.name, args, ctx); }
-        catch (e) { esito = `ERRORE: ${e.message}`; }
+        catch (e) { esito = `ERROR: ${e.message}`; }
         manda({ t: "tool_fine", nome: tc.function.name, output: String(esito).slice(0, 4000) });
         eventiNuovi.push({ t: "tool", nome: tc.function.name, input: args, output: String(esito).slice(0, 4000), ts: Date.now() });
         sessione.messaggi.push({ role: "tool", tool_call_id: tc.id, content: String(esito).slice(0, 60_000) });
@@ -495,7 +495,7 @@ async function giroAgente(req, res, sessione, messaggioUtente) {
     }
   } catch (e) {
     if (e.name !== "AbortError") manda({ t: "errore", v: String(e.message || e) });
-    else manda({ t: "errore", v: "fermato dall'utente" });
+    else manda({ t: "errore", v: "stopped by user" });
   } finally {
     inCorso.delete(sessione.id);
     if (anon) await salvaJSON(fileAnonimi(sessione.cartella), anon);
@@ -523,10 +523,11 @@ const server = createServer(async (req, res) => {
 
     if (p === "/api/sessioni" && req.method === "POST") {
       const { cartella, nome } = await corpoJSON(req);
-      const abs = resolve(cartella || "");
-      if (!existsSync(abs)) return err(res, `La cartella non esiste: ${abs}`);
+      // Windows "copia come percorso" incolla le virgolette attorno: via
+      const abs = resolve(String(cartella || "").trim().replace(/^"+|"+$/g, ""));
+      if (!existsSync(abs)) return err(res, `Folder does not exist: ${abs}`);
       const s = await stat(abs);
-      if (!s.isDirectory()) return err(res, "Il percorso non e' una cartella");
+      if (!s.isDirectory()) return err(res, "Path is not a folder");
       const sessione = { id: randomUUID(), nome: nome || abs.split(/[\\/]/).pop(), cartella: abs, creato: Date.now(), ultimoUso: Date.now(), costo: 0, messaggi: [], eventi: [] };
       await salvaJSON(fileSessione(sessione.id), sessione);
       return json(res, 200, { sessione: { id: sessione.id, nome: sessione.nome, cartella: abs } });
@@ -535,7 +536,7 @@ const server = createServer(async (req, res) => {
     const mSess = p.match(/^\/api\/sessioni\/([\w-]+)$/);
     if (mSess && req.method === "GET") {
       const s = await leggiJSON(fileSessione(mSess[1]), null);
-      if (!s) return err(res, "sessione non trovata", 404);
+      if (!s) return err(res, "session not found", 404);
       return json(res, 200, { id: s.id, nome: s.nome, cartella: s.cartella, eventi: s.eventi, costo: s.costo || 0, occupata: inCorso.has(s.id) });
     }
     if (mSess && req.method === "DELETE") {
@@ -547,9 +548,9 @@ const server = createServer(async (req, res) => {
     if (p === "/api/chat" && req.method === "POST") {
       const { sessioneId, messaggio } = await corpoJSON(req);
       const sessione = await leggiJSON(fileSessione(sessioneId), null);
-      if (!sessione) return err(res, "sessione non trovata", 404);
-      if (inCorso.has(sessioneId)) return err(res, "questa sessione sta gia' lavorando: aspetta o premi Stop", 409);
-      if (!messaggio?.trim()) return err(res, "messaggio vuoto");
+      if (!sessione) return err(res, "session not found", 404);
+      if (inCorso.has(sessioneId)) return err(res, "this session is already working: wait or press Stop", 409);
+      if (!messaggio?.trim()) return err(res, "empty message");
       return giroAgente(req, res, sessione, messaggio.trim());
     }
 
@@ -562,10 +563,37 @@ const server = createServer(async (req, res) => {
     if (p === "/api/conferma" && req.method === "POST") {
       const { id, approvato } = await corpoJSON(req);
       const risolvi = attese.get(id);
-      if (!risolvi) return err(res, "richiesta scaduta o gia' decisa", 404);
+      if (!risolvi) return err(res, "request expired or already decided", 404);
       attese.delete(id);
       risolvi(!!approvato);
       return json(res, 200, { ok: true });
+    }
+
+    /* sfoglia le cartelle del disco, per il selettore nell'interfaccia */
+    if (p === "/api/cartelle" && req.method === "GET") {
+      const richiesto = String(url.searchParams.get("path") || homedir()).trim().replace(/^"+|"+$/g, "");
+      const abs = resolve(richiesto);
+      let sotto = [];
+      try {
+        sotto = (await readdir(abs, { withFileTypes: true }))
+          .filter((v) => v.isDirectory() && !v.name.startsWith(".") && !["node_modules", "$RECYCLE.BIN", "System Volume Information"].includes(v.name))
+          .map((v) => v.name)
+          .sort((a, b) => a.localeCompare(b));
+      } catch (e) {
+        return err(res, "Cannot open folder: " + e.message);
+      }
+      const casa = homedir();
+      return json(res, 200, {
+        path: abs,
+        padre: dirname(abs),
+        cartelle: sotto,
+        scorciatoie: [
+          { nome: "Home", path: casa },
+          { nome: "Desktop", path: join(casa, "Desktop") },
+          { nome: "Documents", path: join(casa, "Documents") },
+          { nome: "Downloads", path: join(casa, "Downloads") },
+        ].filter((s) => existsSync(s.path)),
+      });
     }
 
     if (p === "/api/spesa" && req.method === "GET") {
@@ -598,13 +626,13 @@ const server = createServer(async (req, res) => {
 
     if (p === "/api/verifica" && req.method === "POST") {
       const cfg = configModello(req);
-      if (!cfg.chiave) return err(res, "nessuna chiave");
+      if (!cfg.chiave) return err(res, "no key");
       const r = await fetch(`${cfg.base}/chat/completions`, { method: "POST", headers: { authorization: `Bearer ${cfg.chiave}`, "content-type": "application/json" }, body: JSON.stringify({ model: cfg.modello, max_tokens: 16, messages: [{ role: "user", content: "di solo: ok" }] }) });
       const t = await r.text(); let d; try { d = JSON.parse(t); } catch { d = {}; }
       return json(res, r.ok ? 200 : r.status, r.ok ? { ok: true, modello: d.model || cfg.modello } : { ok: false, messaggio: d?.error?.message || t.slice(0, 200) });
     }
 
-    err(res, "non trovato", 404);
+    err(res, "not found", 404);
   } catch (e) {
     if (!res.headersSent) err(res, String(e.message || e), 500);
     else res.end();
