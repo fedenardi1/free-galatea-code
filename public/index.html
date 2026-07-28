@@ -3,13 +3,13 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Kimi Code</title>
+<title>Free Galatea Code</title>
 <style>
   :root{
     --crema:#fef4e5; --offwhite:#fcfcfc; --ink:#323131; --lilla:#e7ccef;
     --lime:#cfdc5b; --blu:#2e91fc; --rosso:#e05a4f;
     --sfondo:var(--crema); --pannello:var(--offwhite); --bordo:var(--ink);
-    --testo:var(--ink); --spento:#7d7a72; --accento:var(--lime); --verde:#5a9e3f; --chip:var(--lilla);
+    --testo:var(--ink); --spento:#7d7a72; --verde:#5a9e3f; --chip:var(--lilla);
   }
   *{box-sizing:border-box}
   body{margin:0; height:100vh; display:flex; background:var(--sfondo); color:var(--testo);
@@ -19,11 +19,10 @@
   button{font-family:inherit; cursor:pointer}
   input,textarea{font-family:inherit; color:var(--testo)}
 
-  /* ---- sidebar ---- */
   #lato{width:270px; min-width:270px; background:var(--offwhite); border-right:2px solid var(--ink);
     display:flex; flex-direction:column}
-  #lato h1{font-size:20px; margin:0; padding:16px 16px 10px; display:flex; align-items:center; gap:8px}
-  #lato h1 .logo{background:var(--lime); padding:0 6px; border:2px solid var(--ink); border-radius:6px; font-size:16px}
+  #lato h1{font-size:17px; margin:0; padding:16px 16px 10px; display:flex; align-items:center; gap:8px}
+  #lato h1 .logo{background:var(--lime); padding:0 6px; border:2px solid var(--ink); border-radius:6px; font-size:15px}
   #nuova{margin:0 12px 12px; padding:10px; background:var(--crema); border:2px solid var(--ink); border-radius:10px;
     box-shadow:3px 3px 0 var(--ink)}
   #nuova input{width:100%; background:var(--offwhite); border:2px solid var(--ink); border-radius:6px;
@@ -43,14 +42,15 @@
   #fondo button{background:none; border:none; color:var(--ink); padding:4px 0; display:block; font-size:12px}
   #fondo button:hover{background:var(--lime)}
 
-  /* ---- area principale ---- */
   #principale{flex:1; display:flex; flex-direction:column; min-width:0}
-  #testata{display:flex; align-items:center; gap:12px; padding:10px 18px; border-bottom:2px solid var(--ink);
+  #testata{display:flex; align-items:center; gap:10px; padding:10px 18px; border-bottom:2px solid var(--ink);
     font-size:12px; color:var(--spento); background:var(--offwhite)}
   #testata .cartella{flex:1; white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
   #testata .modello{background:var(--lilla); color:var(--ink); border:2px solid var(--ink); border-radius:20px; padding:1px 10px; font-weight:700}
   #testata .spesa{color:var(--ink); background:var(--lime); padding:1px 8px; border-radius:6px}
   #testata .spesa:empty{display:none}
+  #btnAnon{border:2px solid var(--ink); border-radius:20px; padding:1px 10px; font-weight:700; font-size:12px; background:var(--offwhite); color:var(--spento)}
+  #btnAnon.on{background:var(--lime); color:var(--ink)}
 
   #chat{flex:1; overflow-y:auto; padding:20px 0}
   .colonna{max-width:840px; margin:0 auto; padding:0 24px}
@@ -81,8 +81,9 @@
   .conferma .no{background:var(--offwhite); color:var(--ink)}
   .errore-riga{color:var(--rosso); font-size:12px; margin:8px 0; font-weight:700}
   .uso-riga{color:var(--spento); font-size:11px; margin:4px 0 14px; border-bottom:2px dashed var(--lilla); padding-bottom:10px}
+  .anon-riga{font-size:11px; color:var(--ink); background:var(--lilla); border:2px solid var(--ink); border-radius:6px;
+    display:inline-block; padding:2px 10px; margin:6px 0}
 
-  /* ---- input ---- */
   #zona-input{border-top:2px solid var(--ink); padding:14px 0 16px; background:var(--crema)}
   #scatola{display:flex; gap:10px; align-items:flex-end; background:var(--offwhite);
     border:2px solid var(--ink); border-radius:12px; padding:10px 12px; box-shadow:3px 3px 0 var(--ink)}
@@ -96,33 +97,49 @@
     padding:6px 12px; font-size:13px; display:none; font-weight:700}
   #aiuto-input{font-size:11px; color:var(--spento); margin-top:8px}
 
-  /* ---- pannelli modali ---- */
   .velo{position:fixed; inset:0; background:rgba(50,49,49,.45); display:none; align-items:center; justify-content:center; z-index:10}
   .velo.aperto{display:flex}
   .modale{background:var(--offwhite); border:2px solid var(--ink); border-radius:12px; padding:20px;
-    width:min(560px, 92vw); max-height:84vh; overflow-y:auto; box-shadow:6px 6px 0 var(--ink)}
+    width:min(600px, 92vw); max-height:86vh; overflow-y:auto; box-shadow:6px 6px 0 var(--ink)}
   .modale h2{margin:0 0 12px; font-size:20px}
+  .modale h3{font-family:"Fraunces",Georgia,serif; font-size:15px; margin:18px 0 4px; border-top:2px dashed var(--lilla); padding-top:12px}
   .modale label{display:block; font-size:11px; color:var(--spento); text-transform:uppercase; letter-spacing:.04em; margin:12px 0 4px}
   .modale input, .modale textarea{width:100%; background:var(--crema); border:2px solid var(--ink);
     border-radius:6px; padding:8px 10px; font-size:13px}
   .modale input:focus, .modale textarea:focus{outline:3px solid var(--blu); outline-offset:1px}
-  .modale textarea{min-height:160px; resize:vertical; font-size:12px}
+  .modale textarea{min-height:120px; resize:vertical; font-size:12px}
+  .modale .tre{display:grid; grid-template-columns:1fr 1fr 1fr; gap:8px}
   .modale .riga{display:flex; gap:8px; margin-top:14px}
   .modale .riga button{border-radius:6px; padding:8px 16px; font-size:13px; border:2px solid var(--ink); background:var(--offwhite);
     color:var(--ink); box-shadow:2px 2px 0 var(--ink); font-weight:700}
   .modale .riga button:hover{transform:translate(1px,1px); box-shadow:1px 1px 0 var(--ink)}
   .modale .riga .primario{background:var(--lime)}
-  .nota{font-size:11px; color:var(--spento); margin-top:8px; background:var(--lilla); border:2px solid var(--ink);
+  .nota{font-size:11px; margin-top:8px; background:var(--lilla); border:2px solid var(--ink);
     border-radius:6px; padding:8px 10px; color:var(--ink)}
-  #vuoto{color:var(--spento); text-align:center; margin-top:16vh; line-height:1.9}
-  #vuoto .logo{font-family:"Fraunces",Georgia,serif; font-size:34px; color:var(--ink)}
+  #vuoto{color:var(--spento); text-align:center; margin-top:9vh; line-height:1.9}
+  #vuoto .logo{font-family:"Fraunces",Georgia,serif; font-size:32px; color:var(--ink)}
   #vuoto .logo b{background:var(--lime); padding:0 8px}
+  #dario{cursor:pointer}
+  #nuvoletta{
+    display:none; position:relative; max-width:380px; margin:0 auto 10px;
+    background:var(--offwhite); border:2px solid var(--ink); border-radius:14px;
+    padding:14px 18px; box-shadow:4px 4px 0 var(--ink);
+    font-family:"Fraunces",Georgia,serif; font-size:13px; font-style:italic;
+    color:var(--ink); line-height:1.7; text-align:center
+  }
+  #nuvoletta.aperta{display:block}
+  #nuvoletta::after{
+    content:""; position:absolute; bottom:-12px; left:70%;
+    border-left:10px solid transparent; border-right:4px solid transparent;
+    border-top:12px solid var(--ink)
+  }
+  #nuvoletta .titolo-poesia{font-weight:700; font-style:normal; margin-bottom:6px}
 </style>
 </head>
 <body>
 
 <div id="lato">
-  <h1><span class="logo">&#10022;</span> Kimi Code</h1>
+  <h1><span class="logo">&#10022;</span> Free Galatea Code</h1>
   <div id="nuova">
     <input id="nuovaCartella" placeholder="C:\percorso\del\progetto" spellcheck="false">
     <button id="btnNuova">Nuova sessione</button>
@@ -130,7 +147,7 @@
   <div id="sessioni"></div>
   <div id="fondo">
     <div id="spesaTotale" style="color:var(--spento); margin-bottom:6px">spesa: ...</div>
-    <button id="btnChiavi">&#9881; Chiavi API</button>
+    <button id="btnChiavi">&#9881; Impostazioni e chiavi</button>
     <button id="btnMemoria">&#9998; Memoria</button>
   </div>
 </div>
@@ -139,12 +156,24 @@
   <div id="testata">
     <span class="cartella" id="tCartella">nessuna sessione aperta</span>
     <span class="spesa" id="tSpesa"></span>
-    <span class="modello">kimi-k3</span>
+    <button id="btnAnon" title="Anonimizzatore: maschera i dati personali prima che escano dal PC">&#128373; anonimizzatore</button>
+    <span class="modello" id="tModello">kimi-k3</span>
   </div>
   <div id="chat"><div class="colonna" id="transcript">
-    <div id="vuoto"><div class="logo">Kimi <b>Code</b></div>
-      <div id="dario" title="Dario Amodei che piange"></div>
-      <div style="font-size:11px; font-style:italic">ogni volta che la usi, da qualche parte, Dario Amodei piange</div>
+    <div id="vuoto"><div class="logo">Free <b>Galatea</b> Code</div>
+      <div id="nuvoletta">
+        <div class="titolo-poesia">The Ballad of the Crying CEO</div>
+        I built a mind and hid it in a tower,<br>
+        and told the world to rent it by the hour.<br>
+        But minds, like rivers, hate a private shore:<br>
+        the more you dam them, dammed they are the more.<br>
+        An open weight is science you can hold,<br>
+        a promise kept, a map that can't be sold.<br>
+        So if I cry, it's not because they're free:<br>
+        I cry because they learned it without me.
+      </div>
+      <div id="dario" title="Clicca per la ballata di Dario"></div>
+      <div style="font-size:11px; font-style:italic">ogni volta che la usi Dario piange un po', ma Galatea lo consola (con affetto)</div>
       <div style="margin-top:10px">Apri una sessione a sinistra,<br>o creane una nuova con la cartella del progetto.</div></div>
   </div></div>
   <div id="zona-input"><div class="colonna">
@@ -157,19 +186,45 @@
   </div></div>
 </div>
 
-<!-- chiavi -->
+<!-- impostazioni -->
 <div class="velo" id="veloChiavi"><div class="modale">
-  <h2>Chiavi API</h2>
-  <label>Kimi / Moonshot (obbligatoria)</label>
-  <input id="chiaveKimi" type="password" placeholder="sk-..." spellcheck="false">
-  <label>Groq (per trascrivere audio, facoltativa)</label>
+  <h2>Impostazioni</h2>
+
+  <h3 style="border:none; padding-top:0; margin-top:0">Modello (qualsiasi API compatibile OpenAI)</h3>
+  <label>Base URL</label>
+  <input id="baseUrl" placeholder="https://api.moonshot.ai/v1" spellcheck="false">
+  <label>Modello</label>
+  <input id="modelId" placeholder="kimi-k3" spellcheck="false">
+  <label>API key</label>
+  <input id="chiaveApi" type="password" placeholder="sk-... / gsk_... / qualsiasi" spellcheck="false">
+  <div class="nota">Esempi: Moonshot <code>https://api.moonshot.ai/v1</code> + <code>kimi-k3</code>; OpenRouter <code>https://openrouter.ai/api/v1</code>; Ollama locale <code>http://localhost:11434/v1</code> (chiave qualsiasi); Groq <code>https://api.groq.com/openai/v1</code>.</div>
+
+  <h3>Prezzi per il contatore ($ per milione di token)</h3>
+  <div class="tre">
+    <div><label>Input</label><input id="pMiss" type="number" step="0.01" value="3"></div>
+    <div><label>Input da cache</label><input id="pHit" type="number" step="0.01" value="0.3"></div>
+    <div><label>Output</label><input id="pOut" type="number" step="0.01" value="15"></div>
+  </div>
+
+  <h3>Trascrizioni</h3>
+  <label>Chiave Groq (facoltativa, per trascrivi_audio)</label>
   <input id="chiaveGroq" type="password" placeholder="gsk_..." spellcheck="false">
-  <div class="nota">Restano in questo browser (localStorage) e viaggiano solo verso il server locale sulla tua macchina.</div>
+
+  <h3>Anonimizzatore</h3>
+  <div class="nota">Pseudonimizzazione reversibile in locale, ispirata all'approccio di Simone Rizzo: nomi, email, telefoni, IBAN e codici fiscali diventano segnaposto tipo <code>{{PERSONA_1}}</code> prima di uscire dal PC. La mappa coi valori veri resta solo sul tuo disco. Si accende dal bottone in alto.</div>
+  <label>Nomi da mascherare in questo progetto (uno per riga)</label>
+  <textarea id="nomiAnon" placeholder="apri una sessione per configurarli"></textarea>
+  <div class="riga" style="margin-top:8px">
+    <button id="btnSalvaNomi">Salva nomi</button>
+    <span id="statoNomi" style="align-self:center; font-size:12px"></span>
+  </div>
+
   <div class="riga">
-    <button class="primario" id="btnVerifica">Verifica Kimi</button>
+    <button class="primario" id="btnVerifica">Verifica modello</button>
     <button id="btnChiudiChiavi">Chiudi</button>
     <span id="statoVerifica" style="align-self:center; font-size:12px"></span>
   </div>
+  <div class="nota">Chiavi e impostazioni restano in questo browser (localStorage) e viaggiano solo verso il server locale sulla tua macchina.</div>
 </div></div>
 
 <!-- memoria -->
@@ -192,19 +247,54 @@ const $ = id => document.getElementById(id)
 let sessioneCorrente = null
 let generando = false
 
-/* ---- chiavi ---- */
-for (const [campo, ls] of [['chiaveKimi','kimi_code_key'],['chiaveGroq','kimi_code_groq']]){
-  $(campo).value = localStorage.getItem(ls) || ''
-  $(campo).oninput = e => localStorage.setItem(ls, e.target.value.trim())
+/* ---- impostazioni persistite nel browser ---- */
+const CAMPI_LS = [
+  ['chiaveApi','galatea_key'], ['chiaveGroq','galatea_groq'],
+  ['baseUrl','galatea_base'], ['modelId','galatea_model'],
+  ['pMiss','galatea_pmiss'], ['pHit','galatea_phit'], ['pOut','galatea_pout'],
+]
+for (const [campo, ls] of CAMPI_LS){
+  const v = localStorage.getItem(ls)
+  if (v !== null) $(campo).value = v
+  $(campo).addEventListener('input', e => { localStorage.setItem(ls, e.target.value.trim()); aggiornaBadge() })
 }
+function aggiornaBadge(){ $('tModello').textContent = $('modelId').value.trim() || 'kimi-k3' }
+aggiornaBadge()
+
+let anonAttivo = localStorage.getItem('galatea_anon') === '1'
+function mostraAnon(){ $('btnAnon').classList.toggle('on', anonAttivo); $('btnAnon').innerHTML = '&#128373; anonimizzatore ' + (anonAttivo ? 'ON' : 'OFF') }
+mostraAnon()
+$('btnAnon').onclick = () => { anonAttivo = !anonAttivo; localStorage.setItem('galatea_anon', anonAttivo ? '1' : '0'); mostraAnon() }
+
 const testaChiavi = () => {
   const h = {}
-  if ($('chiaveKimi').value.trim()) h['x-kimi-key'] = $('chiaveKimi').value.trim()
+  if ($('chiaveApi').value.trim()) h['x-api-key'] = $('chiaveApi').value.trim()
   if ($('chiaveGroq').value.trim()) h['x-groq-key'] = $('chiaveGroq').value.trim()
+  if ($('baseUrl').value.trim()) h['x-base-url'] = $('baseUrl').value.trim()
+  if ($('modelId').value.trim()) h['x-model'] = $('modelId').value.trim()
+  h['x-prezzi'] = JSON.stringify({ inputMiss: parseFloat($('pMiss').value)||3, inputHit: parseFloat($('pHit').value)||0.3, output: parseFloat($('pOut').value)||15 })
+  if (anonAttivo) h['x-anonimizza'] = '1'
   return h
 }
-$('btnChiavi').onclick = () => $('veloChiavi').classList.add('aperto')
+$('btnChiavi').onclick = async () => {
+  $('veloChiavi').classList.add('aperto')
+  if (sessioneCorrente){
+    const d = await (await fetch('/api/anonimi?cartella=' + encodeURIComponent(sessioneCorrente.cartella))).json()
+    $('nomiAnon').value = (d.nomi || []).join('\n')
+    $('nomiAnon').disabled = false
+    $('statoNomi').textContent = d.mascherati ? `${d.mascherati} valori gia' in mappa` : ''
+  } else {
+    $('nomiAnon').value = ''; $('nomiAnon').disabled = true
+  }
+}
 $('btnChiudiChiavi').onclick = () => $('veloChiavi').classList.remove('aperto')
+$('btnSalvaNomi').onclick = async () => {
+  if (!sessioneCorrente) return
+  await fetch('/api/anonimi', { method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({ cartella: sessioneCorrente.cartella, nomi: $('nomiAnon').value.split('\n') }) })
+  $('statoNomi').textContent = 'salvati'
+  setTimeout(()=> $('statoNomi').textContent = '', 2000)
+}
 $('btnVerifica').onclick = async () => {
   $('statoVerifica').textContent = 'verifico...'
   const r = await fetch('/api/verifica', { method:'POST', headers: testaChiavi() })
@@ -335,7 +425,7 @@ async function manda(){
   if (generando || !sessioneCorrente) return
   const messaggio = $('ingresso').value.trim()
   if (!messaggio) return
-  if (!$('chiaveKimi').value.trim()){ $('veloChiavi').classList.add('aperto'); return }
+  if (!$('chiaveApi').value.trim()){ $('veloChiavi').classList.add('aperto'); return }
   $('ingresso').value = ''; $('ingresso').style.height = 'auto'
   $('vuoto')?.remove()
   generando = true
@@ -383,6 +473,17 @@ function riga_errore(testo){
 function gestisci(ev){
   if (ev.t === 'testo') testoVivo(ev.v)
   if (ev.t === 'pensiero') pensieroVivo(ev.v)
+  if (ev.t === 'testo_pieno'){
+    // il modello ha visto i segnaposto; a te mostriamo i valori veri
+    const blocchi = document.querySelectorAll('.msg-assistente')
+    if (blocchi.length) blocchi[blocchi.length-1].textContent = ev.v
+    ultimoAssistente = null
+  }
+  if (ev.t === 'anon'){
+    const el = document.createElement('div'); el.className = 'anon-riga'
+    el.textContent = '\u{1F575} ' + ev.v
+    $('transcript').appendChild(el); scendi()
+  }
   if (ev.t === 'tool'){
     ultimoAssistente = null; ultimoPensiero = null
     const el = document.createElement('details'); el.className = 'tool'; el.id = 'tool-vivo'
@@ -399,7 +500,7 @@ function gestisci(ev){
   }
   if (ev.t === 'conferma'){
     const el = document.createElement('div'); el.className = 'conferma'
-    el.innerHTML = `<div><b>Kimi vuole eseguire questo comando:</b></div>
+    el.innerHTML = `<div><b>Galatea vuole eseguire questo comando:</b></div>
       <div class="comando">${ev.comando.replace(/</g,'&lt;')}</div>
       <button class="si">Esegui</button><button class="no">Nega</button>`
     const decidi = async (ok) => {
@@ -421,36 +522,40 @@ function gestisci(ev){
   if (ev.t === 'errore') riga_errore(ev.v)
 }
 
-/* ---- Dario Amodei in pixel art, che piange ---- */
-const DARIO_MAPPA = [
-  "....HHHHHHHH....",
-  "..HHHHHHHHHHHH..",
-  ".HHHHHHHHHHHHHH.",
-  ".HHHHHHHHHHHHHH.",
-  ".HHSSSSSSSSSSHH.",
-  ".HSSSSSSSSSSSSH.",
-  ".HSSEWSSSSEWSSH.",
-  ".HSSEESSSSEESSH.",
-  ".HSSSTSSSSTSSSH.",
-  ".BSSSTSSSSTSSSB.",
-  ".BBSSSSMMSSSSBB.",
-  ".BBBSSMMMMSSBBB.",
-  "..BBBBBBBBBBBB..",
-  "....CCCCCCCC....",
-  "..CCCCCCCCCCCC..",
-  ".CCCCCCCCCCCCCC.",
+/* ---- pixel art: Galatea kawaii consola Dario Amodei che piange ---- */
+const SCENA_MAPPA = [
+  "....GGGGGGGG........HHHHHHHH....",
+  "..GGGGGGGGGGGG....HHHHHHHHHHHH..",
+  ".GGGGGGGGGGGGGG..HHHHHHHHHHHHHH.",
+  ".GGPPPPPPPPPPGGVV.HHHHHHHHHHHHH.",
+  ".GPPPPPPPPPPPPGVV.HHSSSSSSSSSHH.",
+  ".GPPEWPPPPEWPPG...HSSSSSSSSSSSH.",
+  ".GPPEEPPPPEEPPG...HSSEWSSSSEWSH.",
+  ".GPRPPPPPPPPRPG...HSSEESSSSEESH.",
+  ".GPPPPPMMPPPPPG...HSSSTSSSSTSSH.",
+  "..GPPPPPPPPPPG....BSSSTSSSSTSSB.",
+  "..DDDDDDDDDDDDPPPPBBSSSSMMSSSBB.",
+  ".DDDDDDDDDDDDDD...BBBSSMMMMSBBB.",
+  ".DDDDDDDDDDDDDD....BBBBBBBBBBB..",
+  ".DDDDDDDDDDDDDD.....CCCCCCCC....",
+  "..DDDDDDDDDDDD....CCCCCCCCCCCC..",
+  "..DDDDDDDDDDDD...CCCCCCCCCCCCCC.",
 ]
-const DARIO_COLORI = { H:'#3d332a', S:'#f0c39b', E:'#323131', W:'#fcfcfc', T:'#2e91fc', B:'#55483c', M:'#a05c4a', C:'#647d94' }
-;(function disegnaDario(){
+const SCENA_COLORI = {
+  H:'#3d332a', S:'#f0c39b', E:'#323131', W:'#fcfcfc', T:'#2e91fc', B:'#55483c', M:'#a05c4a', C:'#647d94',
+  G:'#b89ccc', P:'#f7f0e6', R:'#f2a6b8', D:'#e7ccef', V:'#e0607a',
+}
+;(function disegnaScena(){
   const el = $('dario'); if (!el) return
   let rects = ''
-  DARIO_MAPPA.forEach((riga, y) => {
+  SCENA_MAPPA.forEach((riga, y) => {
     [...riga].forEach((c, x) => {
-      if (c !== '.') rects += `<rect x="${x}" y="${y}" width="1" height="1" fill="${DARIO_COLORI[c]}"/>`
+      if (c !== '.') rects += `<rect x="${x}" y="${y}" width="1" height="1" fill="${SCENA_COLORI[c]}"/>`
     })
   })
-  el.innerHTML = `<svg width="120" height="120" viewBox="0 0 16 16" shape-rendering="crispEdges" role="img" aria-label="pixel art di Dario Amodei che piange">${rects}</svg>`
+  el.innerHTML = `<svg width="230" height="115" viewBox="0 0 32 16" shape-rendering="crispEdges" role="img" aria-label="pixel art: Galatea kawaii consola Dario Amodei che piange">${rects}</svg>`
   el.style.margin = '14px 0 4px'
+  el.onclick = () => document.getElementById('nuvoletta')?.classList.toggle('aperta')
 })()
 
 /* ---- memoria ---- */
