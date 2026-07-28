@@ -16,7 +16,7 @@ irm https://raw.githubusercontent.com/fedenardi1/free-galatea-code/master/instal
 
 Or click the button above, unzip, and double-click `avvia.cmd`. Requires [Node.js](https://nodejs.org) 20+.
 
-**Unofficial OST**: [Lily Allen, "Nonmonogamummy"](https://www.youtube.com/watch?v=_ycXXlh8jJk). Because *"I'm just trying to be open."* Press play, then code.
+**Unofficial OST**: [Lily Allen, "Nonmonogamummy"](https://www.youtube.com/watch?v=OYus8a2TsS0). Because *"I'm just trying to be open."* Press play, then code.
 
 **Why "Galatea"?** Pygmalion sculpted Galatea and the statue came to life. Open weights are the same story told backwards: intelligence that someone tried to keep as a statue, walking out of the museum. This harness just opens the door.
 
@@ -72,7 +72,7 @@ Open http://localhost:4318, set provider and key in Settings (gear icon), create
 
 - Open models are strong with tools but long jobs can drift. Hard cap of 40 tool rounds per message.
 - Context keeps the last 80 messages; use persistent memory for what must survive.
-- The anonymizer is regex plus your name list, not magic NER: review what it masks (the UI shows you) and add names to the list.
+- The anonymizer requires rizzo-pii running locally; it masks text, not pixels (attached images travel as-is).
 - Commands run with your user permissions. Approve only what you understand.
 - The pixel tears are not a metric of model quality.
 
@@ -140,13 +140,13 @@ node server.mjs
 
 Apri http://localhost:4318, imposta provider e chiave nelle Impostazioni (ingranaggio), crea una sessione su una cartella di progetto e parlaci. Su Windows basta un doppio clic su `avvia.cmd`.
 
-**Colonna sonora non ufficiale**: [Lily Allen, "Nonmonogamummy"](https://www.youtube.com/watch?v=_ycXXlh8jJk). Perché *"I'm just trying to be open."* Premi play, poi programma.
+**Colonna sonora non ufficiale**: [Lily Allen, "Nonmonogamummy"](https://www.youtube.com/watch?v=OYus8a2TsS0). Perché *"I'm just trying to be open."* Premi play, poi programma.
 
 ## Limiti onesti
 
 - I modelli aperti sono bravi con gli strumenti ma sui lavori lunghi possono perdersi. Tetto di 40 giri di strumenti per messaggio.
 - Il contesto tiene gli ultimi 80 messaggi; per ciò che deve sopravvivere c'è la memoria persistente.
-- L'anonimizzatore è regex più la tua lista di nomi, non è NER magica: controlla cosa maschera (l'interfaccia te lo mostra) e aggiungi i nomi alla lista.
+- L'anonimizzatore richiede rizzo-pii acceso in locale; maschera il testo, non i pixel (le immagini allegate viaggiano così come sono).
 - I comandi girano con i tuoi permessi utente: approva solo quello che capisci.
 - Le lacrime in pixel non sono una metrica della qualità del modello.
 
