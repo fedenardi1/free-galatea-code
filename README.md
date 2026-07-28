@@ -16,6 +16,8 @@ irm https://raw.githubusercontent.com/fedenardi1/free-galatea-code/master/instal
 
 Or click the button above, unzip, and double-click `avvia.cmd`. Requires [Node.js](https://nodejs.org) 20+.
 
+**Unofficial OST**: [Lily Allen, "Nonmonogamummy"](https://www.youtube.com/watch?v=_ycXXlh8jJk). Because *"I'm just trying to be open."* Press play, then code.
+
 **Why "Galatea"?** Pygmalion sculpted Galatea and the statue came to life. Open weights are the same story told backwards: intelligence that someone tried to keep as a statue, walking out of the museum. This harness just opens the door.
 
 ## How this was born
@@ -137,6 +139,8 @@ node server.mjs
 ```
 
 Apri http://localhost:4318, imposta provider e chiave nelle Impostazioni (ingranaggio), crea una sessione su una cartella di progetto e parlaci. Su Windows basta un doppio clic su `avvia.cmd`.
+
+**Colonna sonora non ufficiale**: [Lily Allen, "Nonmonogamummy"](https://www.youtube.com/watch?v=_ycXXlh8jJk). Perché *"I'm just trying to be open."* Premi play, poi programma.
 
 ## Limiti onesti
 
