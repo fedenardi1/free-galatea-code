@@ -439,7 +439,7 @@ Rules:
 - Use modifica_file for small edits, scrivi_file for new files or rewrites.
 - Commands (esegui_comando) only run if the user approves them: propose them one at a time and explain what they are for.
 - When you learn a stable user preference or a durable fact about the project, save it with salva_memoria.
-- Attachments: when the user attaches a file it is saved inside the project under allegati/ and the message contains a marker like [attached file: allegati/name.ext]. Go read or process that exact path with your tools (leggi_file for text, trascrivi_audio for audio, or equip yourself for other formats).
+- Attachments: when the user attaches a file it is saved inside the project under allegati/ and the message contains a marker like [attached file: allegati/name.ext]. Go read or process that exact path with your tools (leggi_file for text, trascrivi_audio for audio, or equip yourself for other formats). Attached IMAGES also arrive inside the message as actual images: look at them directly, do not try to read image files with leggi_file.
 - EQUIP YOURSELF: if the task needs a capability you do not have (open a PDF, read an image, OCR, convert media...), do not just refuse. Search for a reputable package with cerca_pacchetti (npm, pypi, github, huggingface), check it with leggi_url if useful, then propose the install via esegui_comando (npm install, pip install, winget install). Prefer widely used, actively maintained projects and say in one line why you picked that one. Installs ALWAYS need the user's approval, and after installing verify it works with a quick command.
 - When you finish a piece of work, summarize in a few lines what you touched.${notaAnon}${istruzioniProgetto}
 
@@ -486,7 +486,32 @@ async function giroAgente(req, res, sessione, messaggioUtente) {
   if (anon) {
     manda({ t: "anon", v: `${Object.keys(anon.mappa).length} values masked - engine: rizzo-pii (local)` });
   }
-  sessione.messaggi.push({ role: "user", content: perModello });
+
+  /* Allegati immagine: se il messaggio cita [attached file: ...png/jpg/...] li
+     leggiamo dalla cartella e li mandiamo al modello COME IMMAGINI (contenuto
+     multimodale OpenAI). Kimi K3 ha la visione nativa; altri modelli visivi pure. */
+  let contenutoUtente = perModello;
+  if (sessione.cartella) {
+    const IMG = /\.(png|jpe?g|gif|webp|bmp)$/i;
+    const citati = [...messaggioUtente.matchAll(/\[attached (?:file|image):\s*([^\]]+)\]/gi)]
+      .map((m) => m[1].trim()).filter((rel) => IMG.test(rel));
+    const parti = [];
+    for (const rel of citati.slice(0, 4)) {
+      try {
+        const buf = await readFile(percorsoSicuro(sessione.cartella, rel));
+        if (buf.length > 10 * 1024 * 1024) { manda({ t: "errore", v: `${rel}: image over 10 MB, skipped` }); continue; }
+        const ext = rel.toLowerCase();
+        const mime = ext.endsWith(".png") ? "image/png" : ext.endsWith(".gif") ? "image/gif" : ext.endsWith(".webp") ? "image/webp" : ext.endsWith(".bmp") ? "image/bmp" : "image/jpeg";
+        parti.push({ type: "image_url", image_url: { url: `data:${mime};base64,${buf.toString("base64")}` } });
+      } catch (e) { manda({ t: "errore", v: `${rel}: ${e.message}` }); }
+    }
+    if (parti.length) {
+      contenutoUtente = [{ type: "text", text: perModello }, ...parti];
+      manda({ t: "anon", v: `${parti.length} image(s) attached to the message` });
+      if (anon) manda({ t: "errore", v: "note: the anonymizer works on text, images are sent as-is (pixels are not masked)" });
+    }
+  }
+  sessione.messaggi.push({ role: "user", content: contenutoUtente });
 
   const ctx = {
     cartella: sessione.cartella,
