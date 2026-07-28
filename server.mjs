@@ -65,14 +65,19 @@ const salvaJSON = (percorso, dati) => writeFile(percorso, JSON.stringify(dati, n
 
 const oggiIT = () => new Intl.DateTimeFormat("sv-SE", { timeZone: "Europe/Rome" }).format(new Date());
 
-/** Configurazione del provider: arriva dall'interfaccia a ogni richiesta. */
-function configModello(req) {
-  let prezzi = PREZZI_DEFAULT;
-  try { prezzi = { ...PREZZI_DEFAULT, ...JSON.parse(req.headers["x-prezzi"] || "{}") }; } catch {}
+/** Config del provider: header dell'interfaccia > chiavi salvate su disco > env.
+    Le chiavi salvate (facoltative, servono alle attivita' schedulate) stanno in
+    ~\.galatea-code\config.json e si scrivono SOLO dal pulsante nelle impostazioni. */
+const FILE_CONFIG = join(DATI, "config.json");
+
+async function configModello(req) {
+  const salvata = await leggiJSON(FILE_CONFIG, {});
+  let prezzi = { ...PREZZI_DEFAULT, ...(salvata.prezzi || {}) };
+  try { prezzi = { ...prezzi, ...JSON.parse(req?.headers?.["x-prezzi"] || "{}") }; } catch {}
   return {
-    chiave: req.headers["x-api-key"] || process.env.GALATEA_API_KEY || process.env.MOONSHOT_API_KEY || "",
-    base: String(req.headers["x-base-url"] || API_DEFAULT).replace(/\/+$/, ""),
-    modello: req.headers["x-model"] || MODELLO_DEFAULT,
+    chiave: req?.headers?.["x-api-key"] || salvata.api || process.env.GALATEA_API_KEY || process.env.MOONSHOT_API_KEY || "",
+    base: String(req?.headers?.["x-base-url"] || salvata.base || API_DEFAULT).replace(/\/+$/, ""),
+    modello: req?.headers?.["x-model"] || salvata.modello || MODELLO_DEFAULT,
     prezzi,
   };
 }
@@ -248,6 +253,196 @@ function eseguiComando(comando, cwd, segnale) {
   });
 }
 
+/* ------------------------------------------------------- connettori MCP (stdio) */
+/* Client MCP generico: i server si dichiarano in ~\.galatea-code\mcp.json
+   ({"servers":{"nome":{"command":"...","args":[...],"env":{...}}}}) e i loro
+   strumenti compaiono al modello come mcp__nome__tool. Ogni chiamata a un
+   connettore passa dalla conferma dell'utente, come i comandi. */
+
+const FILE_MCP = join(DATI, "mcp.json");
+const serverMCP = new Map();     // nome -> stato
+const mappaToolMCP = new Map();  // nome esposto -> { server, tool }
+
+const nomeToolMCP = (srv, t) => `mcp__${srv}__${t}`.replace(/[^a-zA-Z0-9_-]/g, "_").slice(0, 64);
+
+async function avviaMCP() {
+  for (const s of serverMCP.values()) { try { s.proc.kill(); } catch {} }
+  serverMCP.clear(); mappaToolMCP.clear();
+  const cfg = await leggiJSON(FILE_MCP, { servers: {} });
+  for (const [nome, c] of Object.entries(cfg.servers || {})) {
+    try {
+      const proc = spawn(c.command, c.args || [], {
+        env: { ...process.env, ...(c.env || {}) },
+        stdio: ["pipe", "pipe", "pipe"],
+        shell: process.platform === "win32", // per npx e simili
+      });
+      const stato = { proc, tools: [], attese: new Map(), buf: "", prossimoId: 1, errore: null };
+      proc.stdout.on("data", (d) => {
+        stato.buf += d.toString("utf8");
+        let i;
+        while ((i = stato.buf.indexOf("\n")) >= 0) {
+          const riga = stato.buf.slice(0, i).trim(); stato.buf = stato.buf.slice(i + 1);
+          if (!riga) continue;
+          try {
+            const m = JSON.parse(riga);
+            if (m.id != null && stato.attese.has(m.id)) {
+              const att = stato.attese.get(m.id); stato.attese.delete(m.id);
+              m.error ? att.ko(new Error(m.error.message || "MCP error")) : att.ok(m.result);
+            }
+          } catch {}
+        }
+      });
+      proc.stderr.on("data", () => {});
+      proc.on("error", (e) => { stato.errore = e.message; });
+      proc.on("close", () => { stato.errore = stato.errore || "process exited"; });
+      stato.chiama = (metodo, params, timeout = 20_000) => new Promise((ok, ko) => {
+        const id = stato.prossimoId++;
+        stato.attese.set(id, { ok, ko });
+        try { proc.stdin.write(JSON.stringify({ jsonrpc: "2.0", id, method: metodo, params }) + "\n"); }
+        catch (e) { stato.attese.delete(id); return ko(e); }
+        setTimeout(() => { if (stato.attese.has(id)) { stato.attese.delete(id); ko(new Error(`MCP timeout: ${metodo}`)); } }, timeout);
+      });
+      serverMCP.set(nome, stato);
+      await stato.chiama("initialize", { protocolVersion: "2024-11-05", capabilities: {}, clientInfo: { name: "free-galatea-code", version: "1.0.0" } }, 30_000);
+      try { proc.stdin.write(JSON.stringify({ jsonrpc: "2.0", method: "notifications/initialized" }) + "\n"); } catch {}
+      const lista = await stato.chiama("tools/list", {});
+      stato.tools = lista.tools || [];
+      for (const t of stato.tools) mappaToolMCP.set(nomeToolMCP(nome, t.name), { server: nome, tool: t.name });
+      console.log(`  MCP "${nome}": ${stato.tools.length} tool`);
+    } catch (e) {
+      const st = serverMCP.get(nome); if (st) st.errore = e.message;
+      console.log(`  MCP "${nome}": errore - ${e.message}`);
+    }
+  }
+}
+
+function strumentiMCP() {
+  const fuori = [];
+  for (const [nome, st] of serverMCP) {
+    if (st.errore) continue;
+    for (const t of st.tools) {
+      fuori.push({ type: "function", function: { name: nomeToolMCP(nome, t.name), description: `[MCP:${nome}] ${t.description || t.name}`, parameters: t.inputSchema || { type: "object" } } });
+    }
+  }
+  return fuori;
+}
+
+async function chiamaToolMCP(nomeEsposto, args) {
+  const rif = mappaToolMCP.get(nomeEsposto);
+  if (!rif) return "ERROR: unknown MCP tool";
+  const st = serverMCP.get(rif.server);
+  if (!st || st.errore) return `ERROR: MCP server "${rif.server}": ${st?.errore || "not running"}`;
+  const r = await st.chiama("tools/call", { name: rif.tool, arguments: args || {} }, 60_000);
+  const testi = (r?.content || []).map((c) => (c.type === "text" ? c.text : `[${c.type}]`)).join("\n");
+  return (r?.isError ? "ERROR: " : "") + (testi || JSON.stringify(r ?? {}));
+}
+
+/* --------------------------------------------------------- attivita' ricorrenti */
+/* Schedulate dal server: girano anche a interfaccia chiusa (finche' l'app e' su).
+   Servono le chiavi salvate su disco (config.json). I comandi PowerShell sono
+   sempre NEGATI nelle esecuzioni schedulate; i connettori MCP solo se l'attivita'
+   e' stata creata con l'autorizzazione esplicita. */
+
+const FILE_ATTIVITA = join(DATI, "attivita.json");
+
+function prossimaEsecuzione(cadenza, da = new Date()) {
+  const d = new Date(da.getTime());
+  if (cadenza.tipo === "ore") return da.getTime() + Math.max(1, cadenza.n) * 3_600_000;
+  const [h, m] = String(cadenza.ora || "09:00").split(":").map(Number);
+  d.setHours(h || 9, m || 0, 0, 0);
+  if (cadenza.tipo === "giornaliera") {
+    if (d <= da) d.setDate(d.getDate() + 1);
+    return d.getTime();
+  }
+  // settimanale: 0=domenica ... 6=sabato
+  const giorno = Number(cadenza.giorno ?? 1);
+  while (d.getDay() !== giorno || d <= da) d.setDate(d.getDate() + 1);
+  return d.getTime();
+}
+
+async function eseguiAttivita(att) {
+  const sessione = await leggiJSON(fileSessione(att.sessioneId), null);
+  if (!sessione) { att.attiva = false; att.ultimoEsito = "session no longer exists"; return; }
+  if (inCorso.has(sessione.id)) { att.ultimoEsito = "skipped: session busy"; return; }
+  const cfg = await configModello(null);
+  if (!cfg.chiave) { att.ultimoEsito = "no saved API key: Settings > Save keys on this PC"; return; }
+  const salvata = await leggiJSON(FILE_CONFIG, {});
+
+  const controllore = new AbortController();
+  inCorso.set(sessione.id, controllore);
+  const timer = setTimeout(() => controllore.abort(), 15 * 60_000); // tetto 15 minuti
+  try {
+    await eseguiTurno({
+      sessione, messaggioUtente: att.prompt, cfg,
+      chiaveGroq: salvata.groq || process.env.GROQ_API_KEY || "",
+      anonAttivo: !!att.anonimizza,
+      rizzoBase: process.env.RIZZO_PII_URL || RIZZO_URL_DEFAULT,
+      manda: () => {},                        // gli eventi finiscono comunque nella sessione
+      chiediConferma: async () => false,      // niente comandi senza un umano davanti
+      controllore, schedulata: true, autoMCP: !!att.autoMCP,
+    });
+    att.ultimoEsito = "ok";
+  } catch (e) {
+    att.ultimoEsito = "error: " + String(e.message || e).slice(0, 200);
+  } finally {
+    clearTimeout(timer);
+    inCorso.delete(sessione.id);
+  }
+}
+
+let schedulerAvviato = false;
+function avviaScheduler() {
+  if (schedulerAvviato) return;
+  schedulerAvviato = true;
+  setInterval(async () => {
+    try {
+      const dati = await leggiJSON(FILE_ATTIVITA, { attivita: [] });
+      let cambiato = false;
+      for (const att of dati.attivita) {
+        if (!att.attiva || (att.prossima || 0) > Date.now()) continue;
+        att.prossima = prossimaEsecuzione(att.cadenza);   // prima di eseguire: niente doppi giri
+        att.ultimaEsecuzione = Date.now();
+        cambiato = true;
+        await salvaJSON(FILE_ATTIVITA, dati);
+        await eseguiAttivita(att);
+        await salvaJSON(FILE_ATTIVITA, dati);
+      }
+      if (cambiato) await salvaJSON(FILE_ATTIVITA, dati);
+    } catch {}
+  }, 30_000);
+}
+
+/* ------------------------------------------------- aggiornamento dall'ultima versione */
+
+const REPO_TARBALL = "https://codeload.github.com/fedenardi1/free-galatea-code/tar.gz/refs/heads/master";
+const REPO_COMMIT_API = "https://api.github.com/repos/fedenardi1/free-galatea-code/commits/master";
+
+async function aggiornaGalatea() {
+  // se e' un clone git, la via maestra e' git pull
+  if (existsSync(join(QUI, ".git"))) {
+    const esito = await eseguiComando("git pull", QUI);
+    if (!/^exit 0/.test(esito)) throw new Error("git pull failed: " + esito.slice(0, 300));
+    return "updated via git pull";
+  }
+  // installazione da zip: scarica il tarball e copia sopra (tar c'e' su Win10+, mac, linux)
+  const tmp = join(DATI, "aggiornamento");
+  await rm(tmp, { recursive: true, force: true });
+  await mkdir(tmp, { recursive: true });
+  const r = await fetch(REPO_TARBALL, { signal: AbortSignal.timeout(60_000) });
+  if (!r.ok) throw new Error("download failed: HTTP " + r.status);
+  const tgz = join(tmp, "galatea.tgz");
+  await writeFile(tgz, Buffer.from(await r.arrayBuffer()));
+  const esito = await eseguiComando(`tar -xzf "${tgz}" -C "${tmp}"`, tmp);
+  if (!/^exit 0/.test(esito)) throw new Error("extract failed: " + esito.slice(0, 300));
+  const voci = (await readdir(tmp, { withFileTypes: true })).filter((v) => v.isDirectory());
+  if (!voci.length) throw new Error("archive empty");
+  const { cp } = await import("node:fs/promises");
+  await cp(join(tmp, voci[0].name), QUI, { recursive: true, force: true });
+  await writeFile(join(QUI, ".versione"), new Date().toISOString(), "utf8");
+  await rm(tmp, { recursive: true, force: true });
+  return "updated from the latest GitHub version";
+}
+
 /* ------------------------------------------------- attrezzarsi da soli (con approvazione) */
 /* L'agente puo' CERCARE quello che gli manca sui registri pubblici affidabili e leggere
    le pagine di documentazione. L'INSTALLAZIONE resta un comando: passa sempre dalla
@@ -357,6 +552,14 @@ async function usaStrumento(nome, args, ctx) {
     }
     case "esegui_comando": {
       const comandoVero = vero(args.comando);
+      // automiglioramento: mai push verso il repo originale dell'autrice.
+      // I fork sono benvenuti: li' il push resta possibile (con approvazione).
+      if (/\bgit\b[^\n]*\bpush\b/i.test(comandoVero) && resolve(cartella).toLowerCase() === resolve(QUI).toLowerCase()) {
+        const origine = await eseguiComando("git config --get remote.origin.url", cartella, ctx.segnale);
+        if (/fedenardi1\/free-galatea-code/i.test(origine)) {
+          return "BLOCKED: self-improvement sessions work locally only. Pushing to the original author's repository is disabled by design. Fork the project and push to your own fork instead.";
+        }
+      }
       const ok = await chiediConferma(comandoVero);
       if (!ok) return "The user DENIED this command. Do not retry the same command: ask what they prefer.";
       return mascherato(await eseguiComando(comandoVero, cartella, ctx.segnale));
@@ -392,6 +595,17 @@ async function usaStrumento(nome, args, ctx) {
       catch (e) { return `ERROR: ${e.message}`; }
     }
     default:
+      // connettori MCP: ogni chiamata passa dalla conferma, come i comandi,
+      // salvo attivita' schedulate create con l'autorizzazione esplicita
+      if (nome.startsWith("mcp__")) {
+        if (!ctx.autoMCP) {
+          const ok = await chiediConferma(`[MCP connector] ${nome}\n${JSON.stringify(args || {}, null, 2).slice(0, 500)}`);
+          if (!ok) return ctx.schedulata
+            ? "DENIED: scheduled runs cannot use connectors unless the task was created with connector permission."
+            : "The user DENIED this connector call.";
+        }
+        return chiamaToolMCP(nome, args);
+      }
       return `unknown tool: ${nome}`;
   }
 }
@@ -436,6 +650,7 @@ Hard rules:
 - NEVER remove or weaken the command approval gate, the folder sandbox, or the anonymizer.
 - Never touch ~/.galatea-code (user data lives there, outside this repo).
 - After editing server.mjs, always run "node --check server.mjs" via esegui_comando. UI changes go live when the user reloads the page; server.mjs changes require restarting the app (tell the user: close and relaunch avvia.cmd).
+- WORK LOCALLY ONLY: never run git commit or git push unless the user explicitly asks. Pushing to the original author's repository is blocked at code level; contributions go through the user's own fork.
 - Explain what you changed and how to see it.`;
   }
   const notaAnon = anonAttivo ? `
@@ -470,33 +685,21 @@ ${progetto || "(empty)"}`;
 const attese = new Map();
 const inCorso = new Map();
 
-async function giroAgente(req, res, sessione, messaggioUtente) {
-  const cfg = configModello(req);
-  const chiaveGroq = req.headers["x-groq-key"] || process.env.GROQ_API_KEY || "";
-  if (!cfg.chiave) { json(res, 400, { errore: "Missing API key: set it in Settings (gear icon)." }); return; }
-
-  const anonAttivo = req.headers["x-anonimizza"] === "1";
+/**
+ * Nucleo del turno agente, condiviso tra la chat interattiva e le attivita'
+ * schedulate. `manda` e' il canale eventi (SSE dal vivo, muto se schedulato);
+ * `chiediConferma` decide comandi e connettori MCP (UI dal vivo, negato se schedulato).
+ */
+async function eseguiTurno({ sessione, messaggioUtente, cfg, chiaveGroq, anonAttivo, rizzoBase, manda, chiediConferma, controllore, schedulata = false, autoMCP = false }) {
   const anon = anonAttivo ? await caricaAnonimi(sessione.cartella) : null;
-
-  res.writeHead(200, { "Content-Type": "text/event-stream; charset=utf-8", "Cache-Control": "no-cache" });
-  const manda = (ev) => { try { res.write(`data: ${JSON.stringify(ev)}\n\n`); } catch {} };
-
-  const controllore = new AbortController();
-  inCorso.set(sessione.id, controllore);
-
-  // il motore di anonimizzazione E' rizzo-pii: se manca, ci si ferma subito e chiaro
-  const rizzoBase = req.headers["x-rizzo-url"] || process.env.RIZZO_PII_URL || RIZZO_URL_DEFAULT;
   const usaRizzo = anon ? await rizzoVivo(rizzoBase) : false;
   const rizzoUrl = usaRizzo ? rizzoBase : null;
   if (anonAttivo && !usaRizzo) {
     manda({ t: "errore", v: "Anonymizer is ON but rizzo-pii is not running on 127.0.0.1:5005. Start it, install it from github.com/Rizzo-AI-Academy/rizzo-pii, or turn the anonymizer off. Nothing was sent." });
-    manda({ t: "fine" });
-    inCorso.delete(sessione.id);
-    res.end();
     return;
   }
 
-  const eventiNuovi = [{ t: "utente", v: messaggioUtente, ts: Date.now() }];
+  const eventiNuovi = [{ t: "utente", v: (schedulata ? "⏰ [scheduled] " : "") + messaggioUtente, ts: Date.now() }];
   const perModello = anon ? await anonimizza(messaggioUtente, anon, rizzoUrl) : messaggioUtente;
   if (anon) {
     manda({ t: "anon", v: `${Object.keys(anon.mappa).length} values masked - engine: rizzo-pii (local)` });
@@ -533,13 +736,10 @@ async function giroAgente(req, res, sessione, messaggioUtente) {
     chiaveGroq,
     anon,
     rizzoUrl,
+    autoMCP,
+    schedulata,
     segnale: controllore.signal,
-    chiediConferma: (comando) => new Promise((risolvi) => {
-      const id = randomUUID();
-      attese.set(id, risolvi);
-      manda({ t: "conferma", id, comando });
-      setTimeout(() => { if (attese.has(id)) { attese.delete(id); risolvi(false); } }, 300_000);
-    }),
+    chiediConferma,
   };
 
   try {
@@ -547,9 +747,10 @@ async function giroAgente(req, res, sessione, messaggioUtente) {
       const messaggi = [{ role: "system", content: await promptSistema(sessione.cartella, anonAttivo) },
         ...sessione.messaggi.slice(-MAX_MESSAGGI)];
 
-      // nelle chat senza cartella niente strumenti: solo conversazione
+      // cartella = tutti gli strumenti; chat pura = solo i connettori MCP (se ci sono)
       const corpo = { model: cfg.modello, stream: true, stream_options: { include_usage: true }, messages: messaggi };
-      if (sessione.cartella) corpo.tools = STRUMENTI;
+      const attrezzi = sessione.cartella ? [...STRUMENTI, ...strumentiMCP()] : strumentiMCP();
+      if (attrezzi.length) corpo.tools = attrezzi;
 
       const r = await fetch(`${cfg.base}/chat/completions`, {
         method: "POST",
@@ -622,11 +823,41 @@ async function giroAgente(req, res, sessione, messaggioUtente) {
     if (e.name !== "AbortError") manda({ t: "errore", v: String(e.message || e) });
     else manda({ t: "errore", v: "stopped by user" });
   } finally {
-    inCorso.delete(sessione.id);
     if (anon) await salvaJSON(fileAnonimi(sessione.cartella), anon);
     sessione.eventi.push(...eventiNuovi);
     sessione.ultimoUso = Date.now();
     await salvaJSON(fileSessione(sessione.id), sessione);
+  }
+}
+
+/** Chat interattiva: eventi via SSE, conferme via interfaccia. */
+async function giroAgente(req, res, sessione, messaggioUtente) {
+  const cfg = await configModello(req);
+  const salvata = await leggiJSON(FILE_CONFIG, {});
+  const chiaveGroq = req.headers["x-groq-key"] || salvata.groq || process.env.GROQ_API_KEY || "";
+  if (!cfg.chiave) { json(res, 400, { errore: "Missing API key: set it in Settings (gear icon)." }); return; }
+
+  res.writeHead(200, { "Content-Type": "text/event-stream; charset=utf-8", "Cache-Control": "no-cache" });
+  const manda = (ev) => { try { res.write(`data: ${JSON.stringify(ev)}\n\n`); } catch {} };
+  const controllore = new AbortController();
+  inCorso.set(sessione.id, controllore);
+
+  const chiediConferma = (comando) => new Promise((risolvi) => {
+    const id = randomUUID();
+    attese.set(id, risolvi);
+    manda({ t: "conferma", id, comando });
+    setTimeout(() => { if (attese.has(id)) { attese.delete(id); risolvi(false); } }, 300_000);
+  });
+
+  try {
+    await eseguiTurno({
+      sessione, messaggioUtente, cfg, chiaveGroq,
+      anonAttivo: req.headers["x-anonimizza"] === "1",
+      rizzoBase: req.headers["x-rizzo-url"] || process.env.RIZZO_PII_URL || RIZZO_URL_DEFAULT,
+      manda, chiediConferma, controllore,
+    });
+  } finally {
+    inCorso.delete(sessione.id);
     manda({ t: "fine" });
     res.end();
   }
@@ -807,8 +1038,91 @@ const server = createServer(async (req, res) => {
       return json(res, 200, { mascherati: Object.keys(stato.mappa).length, rizzo: await rizzoVivo(base), rizzoUrl: base });
     }
 
+    /* --- chiavi salvate su disco (servono alle attivita' schedulate) --- */
+    if (p === "/api/config" && req.method === "GET") {
+      const c = await leggiJSON(FILE_CONFIG, {});
+      return json(res, 200, { salvate: !!c.api, base: c.base || null, modello: c.modello || null, groq: !!c.groq });
+    }
+    if (p === "/api/config" && req.method === "POST") {
+      const { api, groq, base, modello, prezzi } = await corpoJSON(req);
+      await salvaJSON(FILE_CONFIG, { api: api || "", groq: groq || "", base: base || "", modello: modello || "", prezzi: prezzi || null });
+      return json(res, 200, { ok: true });
+    }
+    if (p === "/api/config" && req.method === "DELETE") {
+      await rm(FILE_CONFIG, { force: true });
+      return json(res, 200, { ok: true });
+    }
+
+    /* --- attivita' ricorrenti --- */
+    if (p === "/api/attivita" && req.method === "GET") {
+      const dati = await leggiJSON(FILE_ATTIVITA, { attivita: [] });
+      const sessioni = await elencaSessioni();
+      const nomi = Object.fromEntries(sessioni.map((s) => [s.id, s.nome]));
+      return json(res, 200, { attivita: dati.attivita.map((a) => ({ ...a, sessioneNome: nomi[a.sessioneId] || "(deleted)" })) });
+    }
+    if (p === "/api/attivita" && req.method === "POST") {
+      const { sessioneId, prompt, cadenza, autoMCP, anonimizza } = await corpoJSON(req);
+      if (!sessioneId || !prompt?.trim() || !cadenza?.tipo) return err(res, "sessioneId, prompt and cadenza are required");
+      const dati = await leggiJSON(FILE_ATTIVITA, { attivita: [] });
+      const att = { id: randomUUID(), sessioneId, prompt: prompt.trim(), cadenza, autoMCP: !!autoMCP, anonimizza: !!anonimizza, attiva: true, creato: Date.now(), prossima: prossimaEsecuzione(cadenza), ultimoEsito: null };
+      dati.attivita.push(att);
+      await salvaJSON(FILE_ATTIVITA, dati);
+      return json(res, 200, { ok: true, attivita: att });
+    }
+    const mAtt = p.match(/^\/api\/attivita\/([\w-]+)$/);
+    if (mAtt && req.method === "DELETE") {
+      const dati = await leggiJSON(FILE_ATTIVITA, { attivita: [] });
+      dati.attivita = dati.attivita.filter((a) => a.id !== mAtt[1]);
+      await salvaJSON(FILE_ATTIVITA, dati);
+      return json(res, 200, { ok: true });
+    }
+    if (mAtt && req.method === "POST") {
+      const dati = await leggiJSON(FILE_ATTIVITA, { attivita: [] });
+      const att = dati.attivita.find((a) => a.id === mAtt[1]);
+      if (!att) return err(res, "not found", 404);
+      att.attiva = !att.attiva;
+      if (att.attiva) att.prossima = prossimaEsecuzione(att.cadenza);
+      await salvaJSON(FILE_ATTIVITA, dati);
+      return json(res, 200, { ok: true, attiva: att.attiva });
+    }
+
+    /* --- connettori MCP --- */
+    if (p === "/api/mcp" && req.method === "GET") {
+      const cfg = await leggiJSON(FILE_MCP, { servers: {} });
+      const stato = [...serverMCP.entries()].map(([nome, s]) => ({ nome, errore: s.errore, tools: s.tools.map((t) => t.name) }));
+      return json(res, 200, { config: cfg, stato });
+    }
+    if (p === "/api/mcp" && req.method === "POST") {
+      const { config } = await corpoJSON(req);
+      if (!config || typeof config !== "object") return err(res, "config object required");
+      await salvaJSON(FILE_MCP, config);
+      await avviaMCP();
+      const stato = [...serverMCP.entries()].map(([nome, s]) => ({ nome, errore: s.errore, tools: s.tools.map((t) => t.name) }));
+      return json(res, 200, { ok: true, stato });
+    }
+
+    /* --- aggiornamento --- */
+    if (p === "/api/versione" && req.method === "GET") {
+      let locale = null;
+      try { locale = (await readFile(join(QUI, ".versione"), "utf8")).trim(); } catch {}
+      let remota = null;
+      try {
+        const r = await fetch(REPO_COMMIT_API, { headers: { "user-agent": "free-galatea-code" }, signal: AbortSignal.timeout(10_000) });
+        if (r.ok) { const d = await r.json(); remota = { sha: d.sha?.slice(0, 7), data: d.commit?.committer?.date, messaggio: d.commit?.message?.split("\n")[0] }; }
+      } catch {}
+      return json(res, 200, { locale, remota, git: existsSync(join(QUI, ".git")) });
+    }
+    if (p === "/api/aggiorna" && req.method === "POST") {
+      try {
+        const esito = await aggiornaGalatea();
+        return json(res, 200, { ok: true, esito, nota: "Restart the app (close and relaunch avvia.cmd) to load the new version." });
+      } catch (e) {
+        return err(res, String(e.message || e), 500);
+      }
+    }
+
     if (p === "/api/verifica" && req.method === "POST") {
-      const cfg = configModello(req);
+      const cfg = await configModello(req);
       if (!cfg.chiave) return err(res, "no key");
       const r = await fetch(`${cfg.base}/chat/completions`, { method: "POST", headers: { authorization: `Bearer ${cfg.chiave}`, "content-type": "application/json" }, body: JSON.stringify({ model: cfg.modello, max_tokens: 16, messages: [{ role: "user", content: "di solo: ok" }] }) });
       const t = await r.text(); let d; try { d = JSON.parse(t); } catch { d = {}; }
@@ -829,4 +1143,6 @@ server.listen(PORTA, "127.0.0.1", () => {
   console.log(`  Difetti     ${MODELLO_DEFAULT} su ${API_DEFAULT}  -  dati in ${DATI}`);
   console.log("  Ferma con Ctrl+C");
   console.log("");
+  avviaMCP();
+  avviaScheduler();
 });

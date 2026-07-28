@@ -169,6 +169,9 @@
     <button id="btnChiavi">&#9881; Settings &amp; keys</button>
     <button id="btnMemoria">&#9998; Memory</button>
     <button id="btnMigliora" title="Open a session on Galatea's own source code and ask the model to improve her">&#10024; Improve Galatea</button>
+    <button id="btnAttivita" title="Recurring tasks that run on a schedule">&#9200; Scheduled tasks</button>
+    <button id="btnMCP" title="MCP connectors: Gmail, WhatsApp, anything">&#128268; Connectors</button>
+    <button id="btnAggiorna" title="Pull the latest version from GitHub">&#10227; Update</button>
   </div>
 </div>
 
@@ -241,6 +244,14 @@
     <span id="statoRizzo" style="align-self:center; font-size:12px"></span>
   </div>
 
+  <h3>Scheduled tasks need this</h3>
+  <div class="riga" style="margin-top:8px">
+    <button id="btnSalvaChiaviPC">Save keys on this PC</button>
+    <button id="btnScordaChiaviPC">Forget saved keys</button>
+    <span id="statoChiaviPC" style="align-self:center; font-size:12px"></span>
+  </div>
+  <div class="nota">Saving writes the keys above to <code>~/.galatea-code/config.json</code> so scheduled tasks can run without the browser. Skip it if you only use the app interactively.</div>
+
   <div class="riga">
     <button class="primario" id="btnVerifica">Test model</button>
     <button id="btnChiudiChiavi">Close</button>
@@ -265,6 +276,52 @@
   <div style="font-size:11px; color:var(--spento); margin-top:12px; font-style:italic">every time you use it Dario cries a little, but Galatea consoles him (with love)</div>
   <div class="riga" style="justify-content:center">
     <button id="btnChiudiBallata">Close</button>
+  </div>
+</div></div>
+
+<!-- scheduled tasks -->
+<div class="velo" id="veloAttivita"><div class="modale">
+  <h2>Scheduled tasks</h2>
+  <div class="nota">They run inside the chosen session while the app is open, even with the browser closed. Commands are always denied in scheduled runs; connectors only if you allow them below. Requires keys saved on this PC (Settings).</div>
+  <div id="listaAttivita" style="margin-top:10px"></div>
+  <h3>New task (runs in the current session)</h3>
+  <label>Prompt</label>
+  <textarea id="attPrompt" rows="3" placeholder="e.g. Summarize new files in allegati/ and update NOTES.md"></textarea>
+  <div class="tre">
+    <div><label>Repeat</label>
+      <select id="attTipo">
+        <option value="ore">every N hours</option>
+        <option value="giornaliera" selected>daily at</option>
+        <option value="settimanale">weekly on</option>
+      </select></div>
+    <div id="attCampoN" style="display:none"><label>N hours</label><input id="attN" type="number" value="6" min="1"></div>
+    <div id="attCampoGiorno" style="display:none"><label>Day</label>
+      <select id="attGiorno"><option value="1">Monday</option><option value="2">Tuesday</option><option value="3">Wednesday</option><option value="4">Thursday</option><option value="5">Friday</option><option value="6">Saturday</option><option value="0">Sunday</option></select></div>
+    <div id="attCampoOra"><label>Time</label><input id="attOra" type="time" value="09:00"></div>
+  </div>
+  <div class="riga" style="margin-top:8px; flex-wrap:wrap">
+    <label style="display:flex; gap:6px; align-items:center; margin:0; text-transform:none"><input type="checkbox" id="attAutoMCP" style="width:auto"> allow connectors without asking</label>
+    <label style="display:flex; gap:6px; align-items:center; margin:0; text-transform:none"><input type="checkbox" id="attAnon" style="width:auto"> anonymizer (needs rizzo-pii running)</label>
+  </div>
+  <div class="riga">
+    <button class="primario" id="btnCreaAttivita">Create task</button>
+    <button id="btnChiudiAttivita">Close</button>
+    <span id="statoAttivita" style="align-self:center; font-size:12px"></span>
+  </div>
+</div></div>
+
+<!-- MCP connectors -->
+<div class="velo" id="veloMCP"><div class="modale">
+  <h2>Connectors (MCP)</h2>
+  <div class="nota">Any MCP stdio server works. Two zero-dependency ones ship with Galatea: <b>Gmail</b> (send email via app password) and <b>WhatsApp</b> (Meta Cloud API). Edit the JSON, save, and their tools appear to the model. Every connector call still asks for your approval.</div>
+  <label>mcp.json</label>
+  <textarea id="mcpJson" rows="12" spellcheck="false" style="font-size:11px"></textarea>
+  <div id="statoMCPServer" style="font-size:12px; margin-top:8px"></div>
+  <div class="riga">
+    <button class="primario" id="btnSalvaMCP">Save &amp; reload</button>
+    <button id="btnEsempioMCP">Load example</button>
+    <button id="btnChiudiMCP">Close</button>
+    <span id="statoMCP" style="align-self:center; font-size:12px"></span>
   </div>
 </div></div>
 
@@ -684,6 +741,119 @@ const SCENA_COLORI = {
   if (piccolo){ piccolo.innerHTML = svg(150); piccolo.onclick = apriBallata }
   $('btnChiudiBallata').onclick = () => $('veloBallata').classList.remove('aperto')
 })()
+
+/* ---- keys saved on disk (for scheduled tasks) ---- */
+$('btnSalvaChiaviPC').onclick = async () => {
+  await fetch('/api/config', { method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({ api: $('chiaveApi').value.trim(), groq: $('chiaveGroq').value.trim(),
+      base: $('baseUrl').value.trim(), modello: $('modelId').value.trim(),
+      prezzi: { inputMiss: parseFloat($('pMiss').value)||3, inputHit: parseFloat($('pHit').value)||0.3, output: parseFloat($('pOut').value)||15 } }) })
+  $('statoChiaviPC').textContent = 'saved on this PC'
+}
+$('btnScordaChiaviPC').onclick = async () => {
+  await fetch('/api/config', { method:'DELETE' })
+  $('statoChiaviPC').textContent = 'forgotten'
+}
+
+/* ---- scheduled tasks ---- */
+function cadenzaLeggibile(c){
+  if (c.tipo === 'ore') return `every ${c.n}h`
+  if (c.tipo === 'giornaliera') return `daily ${c.ora}`
+  const giorni = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat']
+  return `${giorni[c.giorno]} ${c.ora}`
+}
+async function caricaAttivita(){
+  const d = await (await fetch('/api/attivita')).json()
+  const box = $('listaAttivita')
+  box.innerHTML = d.attivita.length ? '' : '<div style="font-size:12px; color:var(--spento)">no tasks yet</div>'
+  for (const a of d.attivita){
+    const el = document.createElement('div')
+    el.style.cssText = 'border:2px solid var(--ink); border-radius:8px; padding:8px 10px; margin-bottom:6px; font-size:12px' + (a.attiva ? '' : '; opacity:.5')
+    el.innerHTML = `<b>${cadenzaLeggibile(a.cadenza)}</b> in <i>${a.sessioneNome}</i> ${a.autoMCP?'&#128268;':''} ${a.anonimizza?'&#128373;':''}<br>
+      ${a.prompt.slice(0,120).replace(/</g,'&lt;')}<br>
+      <span style="color:var(--spento)">next: ${new Date(a.prossima).toLocaleString('en-GB')}${a.ultimoEsito ? ' - last: '+a.ultimoEsito : ''}</span><br>
+      <button data-az="toggle" data-id="${a.id}" style="font-size:11px; margin-top:4px; border:2px solid var(--ink); border-radius:4px; background:var(--offwhite)">${a.attiva?'pause':'resume'}</button>
+      <button data-az="del" data-id="${a.id}" style="font-size:11px; margin-top:4px; border:2px solid var(--ink); border-radius:4px; background:var(--offwhite)">delete</button>`
+    box.appendChild(el)
+  }
+  box.querySelectorAll('button').forEach(b => b.onclick = async () => {
+    await fetch('/api/attivita/' + b.dataset.id, { method: b.dataset.az === 'del' ? 'DELETE' : 'POST' })
+    caricaAttivita()
+  })
+}
+$('btnAttivita').onclick = () => { $('veloAttivita').classList.add('aperto'); caricaAttivita() }
+$('btnChiudiAttivita').onclick = () => $('veloAttivita').classList.remove('aperto')
+$('attTipo').onchange = () => {
+  const t = $('attTipo').value
+  $('attCampoN').style.display = t === 'ore' ? 'block' : 'none'
+  $('attCampoGiorno').style.display = t === 'settimanale' ? 'block' : 'none'
+  $('attCampoOra').style.display = t === 'ore' ? 'none' : 'block'
+}
+$('btnCreaAttivita').onclick = async () => {
+  if (!sessioneCorrente){ $('statoAttivita').textContent = 'open a session first'; return }
+  const t = $('attTipo').value
+  const cadenza = t === 'ore' ? { tipo:'ore', n: parseInt($('attN').value)||6 }
+    : t === 'giornaliera' ? { tipo:'giornaliera', ora: $('attOra').value }
+    : { tipo:'settimanale', giorno: parseInt($('attGiorno').value), ora: $('attOra').value }
+  const r = await fetch('/api/attivita', { method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({ sessioneId: sessioneCorrente.id, prompt: $('attPrompt').value, cadenza,
+      autoMCP: $('attAutoMCP').checked, anonimizza: $('attAnon').checked }) })
+  const d = await r.json()
+  $('statoAttivita').textContent = r.ok ? 'created' : d.errore
+  if (r.ok){ $('attPrompt').value = ''; caricaAttivita() }
+}
+
+/* ---- MCP connectors ---- */
+async function caricaMCP(){
+  const d = await (await fetch('/api/mcp')).json()
+  $('mcpJson').value = JSON.stringify(d.config, null, 2)
+  mostraStatoMCP(d.stato)
+}
+function mostraStatoMCP(stato){
+  $('statoMCPServer').innerHTML = (stato||[]).length
+    ? stato.map(s => `<b>${s.nome}</b>: ${s.errore ? '<span style="color:var(--rosso)">'+s.errore+'</span>' : s.tools.join(', ') || 'no tools'}`).join('<br>')
+    : '<span style="color:var(--spento)">no connectors configured</span>'
+}
+$('btnMCP').onclick = () => { $('veloMCP').classList.add('aperto'); caricaMCP() }
+$('btnChiudiMCP').onclick = () => $('veloMCP').classList.remove('aperto')
+$('btnEsempioMCP').onclick = async () => {
+  const r = await fetch('/mcp.example.json').catch(()=>null)
+  $('mcpJson').value = `{
+  "servers": {
+    "gmail": {
+      "command": "node",
+      "args": ["mcp-servers/gmail-smtp.mjs"],
+      "env": { "GMAIL_USER": "you@gmail.com", "GMAIL_APP_PASSWORD": "xxxx xxxx xxxx xxxx" }
+    },
+    "whatsapp": {
+      "command": "node",
+      "args": ["mcp-servers/whatsapp-cloud.mjs"],
+      "env": { "WHATSAPP_TOKEN": "EAAG...", "WHATSAPP_PHONE_ID": "123456789012345" }
+    }
+  }
+}`
+}
+$('btnSalvaMCP').onclick = async () => {
+  let config
+  try { config = JSON.parse($('mcpJson').value) } catch(e){ $('statoMCP').textContent = 'invalid JSON'; return }
+  $('statoMCP').textContent = 'starting servers...'
+  const r = await fetch('/api/mcp', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ config }) })
+  const d = await r.json()
+  $('statoMCP').textContent = r.ok ? 'saved' : d.errore
+  if (r.ok) mostraStatoMCP(d.stato)
+}
+
+/* ---- update from GitHub ---- */
+$('btnAggiorna').onclick = async () => {
+  const v = await (await fetch('/api/versione')).json().catch(()=>null)
+  const ultima = v?.remota ? `Latest on GitHub: ${v.remota.messaggio} (${new Date(v.remota.data).toLocaleString('en-GB')})` : 'Could not check GitHub.'
+  if (!confirm(`${ultima}\n\nDownload and install the latest version now?`)) return
+  $('btnAggiorna').textContent = 'updating...'
+  const r = await fetch('/api/aggiorna', { method:'POST' })
+  const d = await r.json()
+  $('btnAggiorna').innerHTML = '&#10227; Update'
+  alert(r.ok ? `${d.esito}.\n\n${d.nota}` : 'Update failed: ' + d.errore)
+}
 
 /* ---- memory ---- */
 $('btnMemoria').onclick = async () => {
