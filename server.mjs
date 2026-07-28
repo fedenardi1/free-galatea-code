@@ -354,7 +354,7 @@ Date: ${oggiIT()}
 
 Rules:
 - Reply in the user's language. Be concise and concrete. Never use em dashes.
-- This is a plain chat with no project folder: you have no file tools here.${notaAnonChat}
+- This is a plain chat with no project folder: you have no file tools here. If the user asks you to create, read or edit files, explain that chats have no tools by design, and that they should create a session on a folder (left sidebar, folder icon then "New session"): there you get full file tools, limited to that folder.${notaAnonChat}
 
 ## Global memory
 ${globale || "(empty)"}`;
